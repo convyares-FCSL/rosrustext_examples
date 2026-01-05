@@ -1,0 +1,12 @@
+[package]
+name = "lesson_rcllibrust_template"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rcllibrust = { git = "https://github.com/RosLibRust/roslibrust", package = "roslibrust", features = ["rosbridge", "macro"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "signal"] }
+env_logger = "0.11"
+
+[build-dependencies]
+rcllibrust = { git = "https://github.com/RosLibRust/roslibrust", package = "roslibrust", features = ["codegen"] }

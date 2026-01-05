@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>lesson_00_bootstrap_rclrs</name>
+  <version>0.1.0</version>
+  <description>Lesson 00 (rclrs): workspace bootstrap.</description>
+  <maintainer email="you@example.com">Your Name</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cargo</buildtool_depend>
+
+  <depend>rclrs</depend>
+  <depend>utils_rclrs</depend>
+
+  <export>
+    <build_type>ament_cargo</build_type>
+  </export>
+</package>
