@@ -1,7 +1,4 @@
 /**:
   ros__parameters:
-    topics:
-      chatter: "/tutorial/chatter"
-    qos:
-      reliability: "best_effort"  # Readable strings are better for tutorials
-      depth: 10
+    services:
+      add_two_ints: "/add_two_ints"

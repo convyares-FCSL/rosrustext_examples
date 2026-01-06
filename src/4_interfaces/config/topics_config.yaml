@@ -2,6 +2,6 @@
   ros__parameters:
     topics:
       chatter: "/tutorial/chatter"
-    qos:
-      reliability: "best_effort"  # Readable strings are better for tutorials
-      depth: 10
+      robot_news: "/robot_news"
+      number: "/number"
+      number_count: "/number_count"

@@ -1,7 +1,29 @@
 /**:
   ros__parameters:
-    topics:
-      chatter: "/tutorial/chatter"
     qos:
-      reliability: "best_effort"  # Readable strings are better for tutorials
-      depth: 10
+      profile: "telemetry"
+      profiles:
+        telemetry:
+          reliability: "best_effort"
+          durability: "volatile"
+          depth: 10
+        commands:
+          reliability: "reliable"
+          durability: "volatile"
+          depth: 1
+        state_latched:
+          reliability: "reliable"
+          durability: "transient_local"
+          depth: 1
+        events:
+          reliability: "reliable"
+          durability: "volatile"
+          depth: 50
+        reliable_data:
+          reliability: "reliable"
+          durability: "volatile"
+          depth: 10
+        static_data_latched:
+          reliability: "reliable"
+          durability: "transient_local"
+          depth: 1

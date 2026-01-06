@@ -8,6 +8,9 @@ Add new interface files under:
 - `action/`
 
 ### Configuration
-The `config.yaml` file in this directory contains shared parameters for topics and QoS profiles used across all lessons.
+Shared parameters live in `config/` and are split by type:
+- `config/topics_config.yaml` for topic names.
+- `config/services_config.yaml` for service names.
+- `config/qos_config.yaml` for QoS defaults and profile selection.
 
 Then update `CMakeLists.txt` to include interfaces in `rosidl_generate_interfaces()`.

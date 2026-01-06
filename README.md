@@ -1,7 +1,7 @@
 # ROS 2 lessons workspace
 
 This workspace is being reset into a structured, multi-language lesson series.
-The previous learning project is archived in `src_archive/`.
+
 
 ## Goals
 - Provide a consistent lesson sequence across Python, C++, rclrs, and rcllibrust.
@@ -10,17 +10,21 @@ The previous learning project is archived in `src_archive/`.
 
 ## Planned layout
 - `src/`
-  - `interfaces/` (package `lesson_interfaces` for shared msg/srv/action definitions)
-  - `python/lesson_XX_topic/`
-  - `python/utils_py/` (shared utilities)
-  - `cpp/lesson_XX_topic/`
-  - `cpp/utils_cpp/` (shared utilities)
-  - `rclrs/lesson_XX_topic/`
-  - `rclrs/utils_rclrs/` (shared utilities)
-  - `rcllibrust/lesson_XX_topic/`
-  - `rcllibrust/utils_rcllibrust/` (shared utilities)
+   - `python/`
+     - `lesson_XX_topic/`
+     - `utils_py/` (shared utilities, QOS profiles, python specific)
+  - `cpp/`
+    - `lesson_XX_topic/`
+    - `utils_cpp/` (shared utilities, QOS profiles, cpp specific)
+  - `rust/`
+    - `rclrs/`
+      - `lesson_XX_topic/`
+    - `rcllibrust/`
+      - `lesson_XX_topic/`
+    - `utils_rust/` (shared utilities, QOS profiles, rust specific)
+  - `4_interfaces/` (package `lesson_interfaces` for shared msg/srv/action definitions and shared configuration)
+  - `src/4_interfaces/config/*.yaml` (central configuration for all lessons)
 - `templates/` (starting templates for each language)
-- `src_archive/` (original learning workspace snapshot)
 
 ## Lesson roadmap
 Lesson 00 - workspace bootstrap
@@ -34,10 +38,12 @@ Lesson 01 - simple node
 Lesson 02 - publisher
 - Publish `std_msgs/String` on `chatter`.
 - Parameter for publish rate.
+- **New Pattern**: Uses parameters from `src/4_interfaces/config/topics_config.yaml` and `src/4_interfaces/config/qos_config.yaml`.
 
 Lesson 03 - subscriber
 - Subscribe to `chatter`.
 - QoS selection and logging.
+- **New Pattern**: Uses parameters from `src/4_interfaces/config/topics_config.yaml` and `src/4_interfaces/config/qos_config.yaml`.
 
 Lesson 04 - services
 - `example_interfaces/srv/AddTwoInts` server and client.
@@ -81,6 +87,23 @@ Template locations:
 ## Build notes
 - `src/rcllibrust` is built with `cargo` and is excluded from `colcon` via `COLCON_IGNORE`.
 
+
+### Using Parameters
+This example shows a "professional" pattern where configuration is split by type in `src/4_interfaces/config/`:
+- `topics_config.yaml` for topic names.
+- `qos_config.yaml` for QoS defaults and profile selection (`telemetry`, `commands`, `state_latched`, `events`, `reliable_data`, `static_data_latched`).
+- `services_config.yaml` for service names (used in Lesson 04+).
+Shared utility modules (`utils_py` and `utils_rclrs`) handle the boilerplate of declaring and reading these parameters.
+
+To run with the configuration:
+```bash
+# Example for Python publisher
+ros2 run lesson_02_publisher_py publisher --ros-args \
+  --params-file src/4_interfaces/config/topics_config.yaml \
+  --params-file src/4_interfaces/config/qos_config.yaml
+```
+
+Launch File Power: This sets you up perfectly for later lessons on Launch Files, where you can show one launch file starting a C++ talker and a Rust listener, both sharing the same configuration files.
 
 Good tutorials : 
 https://www.youtube.com/@RoboticsBackEnd/posts {has udemy course :https://www.udemy.com/user/edouard-renard/ }

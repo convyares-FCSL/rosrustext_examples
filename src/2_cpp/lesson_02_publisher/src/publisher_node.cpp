@@ -7,13 +7,15 @@ PublisherNode::PublisherNode(const rclcpp::NodeOptions &options)
   period_ = std::chrono::duration_cast<std::chrono::milliseconds>(
       std::chrono::duration<double>(period_s));
 
-  publisher_ = create_publisher<Msg>(topics::CHATTER, qos::telemetry());
+  const auto topic = topics::from_params(*this, topics::CHATTER, "/tutorial/chatter");
+  const auto qos_profile = qos::from_parameters(*this);
+  publisher_ = create_publisher<Msg>(topic, qos_profile);
   timer_ = create_wall_timer(period_, [this]() { publish_message(); });
 
   RCLCPP_INFO(
       get_logger(),
       "Lesson 02 publisher started (topic: %s, period: %ld ms).",
-      topics::CHATTER,
+      topic.c_str(),
       static_cast<long>(period_.count()));
 }
 

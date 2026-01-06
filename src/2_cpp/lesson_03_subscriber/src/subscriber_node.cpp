@@ -2,15 +2,17 @@
 
 SubscriberNode::SubscriberNode(const rclcpp::NodeOptions &options)
 : rclcpp::Node("lesson_03_subscriber", options) {
+  const auto topic = topics::from_params(*this, topics::CHATTER, "/tutorial/chatter");
+  const auto qos_profile = qos::from_parameters(*this);
   subscription_ = create_subscription<Msg>(
-      topics::CHATTER,
-      qos::telemetry(),
+      topic,
+      qos_profile,
       [this](const Msg &msg) { on_message(msg); });
 
   RCLCPP_INFO(
       get_logger(),
       "Lesson 03 subscriber started (topic: %s).",
-      topics::CHATTER);
+      topic.c_str());
 }
 
 void SubscriberNode::on_message(const Msg &msg) {

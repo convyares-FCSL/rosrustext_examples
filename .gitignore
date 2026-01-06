@@ -1,7 +1,18 @@
-# ROS 2 build artifacts
+# ROS 2 build artifacts (Workspace root)
 build/
 install/
 log/
+
+# Recursive build artifacts (Matches inside src/2_cpp, src/rclrs, etc.)
+**/build/
+**/install/
+**/log/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.egg-info/
+.pytest_cache/
+**/compile_commands.json
 
 # Colcon
 colcon.meta
@@ -9,24 +20,33 @@ colcon.pkg
 
 # C++ tooling
 compile_commands.json
+.cache/
 
 # Python
 __pycache__/
 *.pyc
 *.pyo
 *.egg-info/
+.pytest_cache/
 
 # Rust
-/target/
+# Removing the leading slash makes it recursive
+target/
+**/target/
+Cargo.lock
+**/Cargo.lock
 
 # Editor
 .vscode/
 .idea/
+.DS_Store
 *.swp
 *.swo
 
 # OS
 .DS_Store
 
-# Misc
+# Project specific
 /src_archive/
+.output.txt
+.cargo/

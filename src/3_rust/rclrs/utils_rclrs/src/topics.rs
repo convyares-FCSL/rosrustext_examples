@@ -1,5 +1,9 @@
 use rclrs::Node;
 
+pub const ROBOT_NEWS_TOPIC: &str = "robot_news";
+pub const NUMBER_TOPIC: &str = "number";
+pub const NUMBER_COUNT_TOPIC: &str = "number_count";
+
 pub fn from_params(node: &Node, topic_name: &str, default_value: &str) -> String {
     node.declare_parameter(&format!("topics.{}", topic_name))
         .default(default_value)
