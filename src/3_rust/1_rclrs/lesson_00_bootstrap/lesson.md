@@ -62,6 +62,7 @@ cd ~/ros2_ws_tutorial
 colcon build --packages-up-to lesson_00_bootstrap_rclrs
 ```
 - Unlike the Python lesson, Rust changes require a rebuild (and re-sourcing) to take effect.
+
 ---
 
 ## Running the Node
