@@ -50,3 +50,4 @@ Cargo.lock
 /src_archive/
 .output.txt
 .cargo/
+/secret/

@@ -2,9 +2,10 @@
 name = "lesson_01_node_rcllibrust"
 version = "0.1.0"
 edition = "2021"
+publish = false
 
 [dependencies]
 roslibrust = { git = "https://github.com/RosLibRust/roslibrust", package = "roslibrust", features = ["rosbridge"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "signal"] }
 env_logger = "0.11"
-utils_rcllibrust = { path = "../../utils_rust" }
+log = "0.4"

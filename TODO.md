@@ -9,22 +9,15 @@ The goal is not feature creep, but clarity, consistency, and professional realis
 
 ## High Priority (Structure & Consistency)
 
-- [ ] Normalize directory layout across all tracks
+- [X] Normalize directory layout across all tracks
   - Confirm `1_python / 2_cpp / 3_rust / 4_interfaces` is final
   - Ensure all lessons follow `lesson_XX_<topic>` naming
 
-- [ ] Ensure Lesson 00 exists and builds for all languages
+- [X] Ensure Lesson 00 exists and builds for all languages
   - Python ✔
   - C++ ✔
   - rclrs ✔
   - rcllibrust ✔
-
-- [ ] Add missing `Lesson.md` files where placeholders exist
-  - lesson_01_node
-  - lesson_02_publisher
-  - lesson_03_subscriber
-
-- [ ] Verify all lesson packages share the same topic/service/action names
 
 ---
 
@@ -48,7 +41,10 @@ The goal is not feature creep, but clarity, consistency, and professional realis
 
 ## Lesson Content Roadmap
 
-- [ ] Lesson 04 – Services
+- [X] Lesson 01 – Simple node
+- [ ] Lesson 02 – Publisher
+- [ ] Lesson 03 – Services
+- [ ] Lesson 04 – Subscriber
 - [ ] Lesson 05 – Parameters
 - [ ] Lesson 06 – Lifecycle nodes
 - [ ] Lesson 07 – Actions
@@ -83,6 +79,8 @@ Each lesson should:
 ---
 
 ## Documentation & Cleanup
+
+- [ ] Verify all lesson packages share the same topic/service/action names
 
 - [ ] Review top-level README after Lesson 09 is complete
 - [ ] Add diagrams only where they clarify behaviour

@@ -35,7 +35,7 @@ fn main() -> Result<(), RclrsError> {
     // Create the node via a constructor, mirroring the rclpy pattern.
     let bootstrap = BootstrapNode::new(&executor)?;
 
-    // Spin the executor once without blocking.
+    // Spin the executor, handling errors appropriately.
     executor
         .spin(SpinOptions::spin_once().timeout(Duration::from_millis(0)))
         .ignore_non_errors()
