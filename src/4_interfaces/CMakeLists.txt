@@ -6,20 +6,12 @@ find_package(rosidl_default_generators REQUIRED)
 
 # Add interface files here as you introduce new lessons.
 # Example:
-# set(msg_files
-#   "msg/Example.msg"
-# )
-# set(srv_files
-#   "srv/Example.srv"
-# )
-# set(action_files
-#   "action/Example.action"
-# )
-#
-# rosidl_generate_interfaces(${PROJECT_NAME}
-#   ${msg_files}
-#   ${srv_files}
-#   ${action_files}
-# )
+set(msg_files
+  "msg/MsgCount.msg"
+)
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  ${msg_files}
+)
 
 ament_package()
