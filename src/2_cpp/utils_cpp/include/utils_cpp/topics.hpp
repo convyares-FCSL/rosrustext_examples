@@ -21,4 +21,20 @@ inline std::string from_params(
       std::string("topics.") + topic_name, default_value);
 }
 
+inline std::string chatter(rclcpp::Node &node) {
+  return from_params(node, "chatter", CHATTER);
+}
+
+inline std::string robot_news(rclcpp::Node &node) {
+  return from_params(node, "robot_news", ROBOT_NEWS_TOPIC);
+}
+
+inline std::string number(rclcpp::Node &node) {
+  return from_params(node, "number", NUMBER_TOPIC);
+}
+
+inline std::string number_count(rclcpp::Node &node) {
+  return from_params(node, "number_count", NUMBER_COUNT_TOPIC);
+}
+
 }  // namespace topics
