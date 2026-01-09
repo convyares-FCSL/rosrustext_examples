@@ -19,7 +19,7 @@ setup(
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [
-            "lesson_02_node = lesson_02_publisher_py.node:main",
+            "lesson_02_publisher = lesson_02_publisher_py.node:main",
         ],
     },
 )

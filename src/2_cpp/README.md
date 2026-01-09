@@ -86,6 +86,15 @@ int main(int argc, char ** argv) {
 
 ## Lessons
 
-1. **Lesson 00**: Bootstrap (Header/Source split).
-2. **Lesson 01**: Event Loop (Timers & `std::bind`).
-3. **Lesson 02**: Publishers (Typed Interfaces & `utils_cpp`).
+1. **Lesson 00**: Bootstrap  
+   Header/source separation and clean startup/shutdown.
+
+2. **Lesson 01**: Event Loop  
+   Timers, parameters, and event-driven execution using lambda callbacks.
+
+3. **Lesson 02**: Publishers  
+   Typed interfaces, shared configuration (`utils_cpp`), and system data sources.
+
+4. **Lesson 03**: Subscribers & System Verification  
+   QoS compatibility, cross-language validation, logic injection for callbacks,
+   and tolerance to late joiners and publisher restarts.
