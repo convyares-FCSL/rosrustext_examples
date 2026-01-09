@@ -61,6 +61,7 @@ The flow of logic moves from the *Setup* phase to the *Runtime* phase.
 
 1. **Setup (`setup_timer`)**: Reads the `timer_period_s` parameter, validates it, and registers the callback.
 2. **Runtime (`on_tick`)**: The callback fires.
+
 ```cpp
 void Lesson02Node::on_tick() {
   // 1. Update State
@@ -77,8 +78,6 @@ void Lesson02Node::on_tick() {
 }
 
 ```
-
-
 
 ### 4. Memory Management (Smart Pointers)
 

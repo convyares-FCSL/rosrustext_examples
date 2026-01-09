@@ -22,29 +22,49 @@ so that behaviour, naming, and configuration patterns can be compared directly.
 
 ```text
 src/
-├─ 1_python/              # Python lessons (rclpy)
+├─ 1_python/                 # Python lessons (rclpy)
 │   ├─ lesson_00_bootstrap
 │   ├─ lesson_01_node
-│   └─ lesson_02_publisher
+│   ├─ lesson_02_publisher
+│   └─ lesson_03_subscriber
+│   └─ utils_py/             # Python-specific utilities
 │
-├─ 2_cpp/                 # C++ lessons (rclcpp)
+├─ 2_cpp/                    # C++ lessons (rclcpp)
 │   ├─ lesson_00_bootstrap
 │   ├─ lesson_01_node
-│   └─ lesson_02_publisher
+│   ├─ lesson_02_publisher
+│   └─ lesson_03_subscriber
+│   └─ utils_cpp/            # C++-specific utilities
 │
 ├─ 3_rust/
-│   ├─ 1_rclrs/           # Native Rust Nodes (Primary Track)
-│   └─ 2_rcllibrust/      # Rust Client/Bridge (Secondary Track)
+│   ├─ 1_rclrs/              # Native Rust Nodes (Primary Track)
+│   │   ├─ lesson_00_bootstrap
+│   │   ├─ lesson_01_node
+│   │   ├─ lesson_02_publisher
+│   │   └─ lesson_03_subscriber
+│   │   └─ utils_rclrs/      # Rust (rclrs)-specific utilities
+│   │
+│   └─ 2_rcllibrust/         # Rust Client/Bridge (Secondary Track)
+│       ├─ lesson_00_bootstrap
+│       ├─ lesson_01_node
+│       ├─ lesson_02_publisher
+│       └─ lesson_03_subscriber
+│       └─ utils_rcllibrust/    # Rust (rcllibrust)-specific utilities
 │
-├─ 4_interfaces/          # Shared Definitions
-│   ├─ msg/               # e.g., MsgCount.msg
-│   └─ config/            # Shared .yaml configuration
+├─ 4_interfaces/          
+│   ├─ lesson_interfaces/    # Shared interfaces
+│   │   ├─config/            # yaml config
+│   │   ├─msg/               # message interface
+│   │   ├─srv/               # service interface
+│   │   ├─action/            # action interface
+│   │   
+│   ├─ rosidl_rust/          # ROSIDL for Rust
 │
-├─ 5_benchmark/           # Engineering Studies (Latency/Jitter)
-│   └─ README.md
+├─ 5_benchmark/              # Engineering Studies (Latency/Jitter)
 │
-templates/                # Starter boilerplate for new packages
-
+templates/                   # Starter boilerplate for new packages
+│
+scripts/                     # Script for benchmarking
 ```
 
 ---
@@ -55,12 +75,15 @@ Unlike tutorials that use simple scripts, this workspace teaches scalable patter
 
 1. **Lesson 00 (The Container)**:
 Wraps the Node in a Class/Struct to manage lifecycle (RAII). Ensures clean shutdown and prevents "zombie nodes."
+
 2. **Lesson 01 (The Event Loop)**:
 Introduces shared state (Atomic counters in Rust, Class members in Python/C++) and timer scheduling.
-3. **Lesson 02 (Composition)**:
-Separates **Logic** (Business Components) from **Lifecycle** (The Node). Introduces dependency injection and **Custom Interfaces**.
 
----
+3. **Lesson 02 (Composition)**:
+Separates **Logic** (application behaviour) from **Lifecycle** (ROS resource ownership). Introduces dependency injection and **Custom Interfaces**.
+
+4. **Lesson 03 (System Verification)**:
+Validates language-agnostic communication, QoS compatibility, and stream robustness (late joiners, restarts, resets). Introduces logic injection for subscriber callbacks and transport-aware validation.
 
 ---
 
@@ -84,12 +107,13 @@ Separates **Logic** (Business Components) from **Lifecycle** (The Node). Introdu
 * Using shared utility libraries (`utils_py`, `utils_rclrs`, `utils_roslibrust`) for configuration.
 * **Composition**: Moving logic out of the main node class.
 
+### Lesson 03 – Subscriber (Implemented)
 
-
-### Lesson 03 – Subscriber (Planned)
-
-* **Goal**: Subscribe to `chatter` and log data.
-* **Focus**: QoS matching (Reliable vs Best Effort) and callback concurrency.
+* **Goal**: Verify cross-language message flow using a shared interface.
+* **Focus**:
+  * QoS compatibility as a configuration concern
+  * Late-joiner handling and publisher reset tolerance
+  * Logic injection for subscriber callbacks
 
 ### Lesson 04 – Services (Planned)
 
@@ -160,9 +184,13 @@ The reference implementation offering the lowest latency and most manual control
 
 * **See**: `src/2_cpp/README.md` for header/source split details.
 
-### Rust (`rclrs`)
+### Rust (`rclrs` & `roslibrust`)
 
-Native Rust bindings focusing on memory safety and correctness.
+Split into two tracks to demonstrate different architectural roles:
+
+rclrs: Native DDS nodes using colcon. (The primary track).
+
+roslibrust: Async/Tokio clients using rosbridge. (The external integration track).
 
 * **See**: `src/3_rust/README.md` for critical build dependency instructions (`../../install/...`).
 

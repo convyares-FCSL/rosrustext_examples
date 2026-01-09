@@ -1,149 +1,155 @@
-# Lesson 02 Breakdown: Components & Shared Interfaces
+# Lesson 02 Breakdown: Components, State Boundaries, and Shared Interfaces (rclrs)
 
-## Architecture: Component-Based Design
+## Architectural Intent
 
-As nodes grow, keeping all variables (publishers, subscribers, counters, flags) in one struct becomes unmanageable, in Lesson 01, we passed `count` manually into the timer.
+Lesson 02 introduces the first real scaling constraint:
 
-**Lesson 02 introduces Composition.**
+> A single “node struct” that owns every publisher, subscriber, timer, counter, and flag turns into an unmaintainable state blob.
 
+The goal of this lesson is not “how to publish” — it’s establishing a **component boundary** so state stays local to the feature that owns it.
 
+---
 
-We separate the code into two distinct layers:
-1.  **The Logic Component (`PublisherChatter`)**: Handles the "Business Logic" (what the node *does*). It owns the Publisher and the State (`count`).
-2.  **The Node Container (`Lesson02Node`)**: Handles the "Lifecycle" (startup, shutdown, keeping handles alive). It owns the Component.
+## The Component Rule
 
-## New Concept: External Messages
+From Lesson 02 onward, the pattern is:
 
-In Lesson 01, we didn't publish anything. In this lesson, we publish a custom message.
+* **Node container** owns lifecycle and keep-alive handles.
+* **Each ROS capability** (publisher / subscriber / service / action / timer-driven worker) lives in its own struct with:
 
-```rust
-use lesson_interfaces::msg::MsgCount;
+  * the ROS handle(s) it needs
+  * the state it owns
+  * the methods that operate on that state
 
-```
+In Lesson 02, that “capability” is the chatter publisher.
 
-* **The Source**: This struct (`MsgCount`) is NOT defined in our Rust code manually. It is defined in a ROS 2 interface file (`MsgCount.msg`) in the `lesson_interfaces` package.
-* **The Generation**: When we build, `rosidl_generator_rs` reads that file and generates a Rust struct with the necessary traits (Serialize, Deserialize) to communicate over the DDS middleware.
-* **The Import**: We import it like a standard crate, allowing us to share data structures seamlessly between C++, Python, and Rust nodes.
+---
 
-## New Concept: Shared Library (`utils_rust`)
+## Why the Publisher Lives in `PublisherChatter` (Not the Node)
 
-Hardcoding topic names (e.g., `"chatter"`) and QoS settings inside the node code is a bad practice. If you change the topic name in the publisher, you must remember to change it in the subscriber.
+Your code puts the publisher into a dedicated struct for a concrete scaling reason:
 
-We use a local crate `utils_rust` to centralize this configuration.
+### 1) State stays where it belongs
 
-```rust
-use utils_rust::{qos, topics};
-
-```
-
-1. **Topic Consistency**: `topics::chatter(node)` returns the canonical topic name. Both the Publisher node and (in future lessons) the Subscriber node call this same function.
-2. **QoS Configuration**: `qos::from_parameters(node)` allows us to configure Quality of Service (Reliability, Durability) via command-line parameters without recompiling the code.
-
-## Code Walkthrough
-
-### 1. The Logic Component
-
-This struct is the "Brain" of the operation. It is self-contained.
+The counter is not “node state”. It is **publisher state**:
 
 ```rust
 struct PublisherChatter {
-    publisher: Publisher<MsgCount>, // Typed to our custom message
+    publisher: Publisher<MsgCount>,
     count: AtomicU64,
-    _logger: Logger, 
+    _logger: Logger,
 }
-
 ```
 
-### 2. The Logic Implementation
+If later you add:
 
-Notice how clean the logic becomes. It operates on `self` and uses the generated message struct.
+* a second publisher
+* a subscriber
+* a service
+* an action server
+
+each gets *its own* state struct, rather than growing a single `Lesson02Node` into a god-object.
+
+### 2) The callback owns a stable dependency
+
+The timer closure needs a stable target to call:
 
 ```rust
-impl PublisherChatter {
-    // Pure logic function.
-    fn on_tick(&self) -> Result<(), RclrsError> {
-        // Increment count.
-        let n = self.count.fetch_add(1, Ordering::Relaxed) + 1;
-
-        // Build message. 
-        // We use the struct generated from the .msg file.
-        let msg = MsgCount { count: n as i64 };
-
-        // Publish message.
-        self.publisher.publish(&msg)?;
-
-        Ok(())
-    }
-}
-
+move || { chatter.on_tick().expect("Timer callback failed"); }
 ```
 
-### 3. The Resource Container
+By putting publisher + state in one struct and wrapping it in `Arc`, the callback captures **one thing** that fully represents that capability.
 
-The container now holds the **Component** instead of raw data.
+### 3) The node stays wiring-only
+
+`Lesson02Node::new()` reads like a composition root:
+
+```rust
+let publisher = Arc::new(Self::build_chatter_publisher(&node)?);
+let timer = Self::build_timer(&node, Arc::clone(&publisher), period_param)?;
+```
+
+The node is responsible for:
+
+* creating resources
+* connecting them
+* keeping them alive
+
+It does not own the logic state directly.
+
+---
+
+## Shared Interfaces: `MsgCount` is the Contract
+
+```rust
+use lesson_interfaces::msg::MsgCount;
+```
+
+`MsgCount` is generated from a `.msg` definition and shared across languages. The practical outcome is:
+
+* Rust publishes a message that Python/C++ subscribers can decode without translation glue.
+* The system contract lives in `src/4_interfaces/msg`, not in any language’s code.
+
+---
+
+## Shared Configuration: Topics + QoS are Not Embedded in Nodes
+
+```rust
+use utils_rclrs::{qos, topics};
+```
+
+Lesson 02 deliberately avoids “string + QoS sprinkled in code”. Instead:
+
+* `topics::chatter(node)` returns the canonical name
+* `qos::from_parameters(node)` returns the canonical QoS profile
+
+This makes compatibility a configuration concern, which becomes critical in Lesson 03.
+
+---
+
+## Setup vs Runtime Responsibilities
+
+Lesson 02 keeps runtime logic narrow and local.
+
+### Runtime: `on_tick()` owns only publish logic
+
+```rust
+fn on_tick(&self) -> Result<(), RclrsError> {
+    let n = self.count.fetch_add(1, Ordering::Relaxed) + 1;
+    let msg = MsgCount { count: n as i64 };
+    self.publisher.publish(&msg)?;
+    Ok(())
+}
+```
+
+No config lookup. No ROS resource creation. No lifecycle work.
+
+### Setup: `Lesson02Node` wires components and holds handles
 
 ```rust
 struct Lesson02Node {
     pub node: Node,
-    // The underscore prefix indicates these are held for RAII (keep-alive) purposes.
     _publisher_component: Arc<PublisherChatter>,
-    _timer: Arc<rclrs::Timer>, 
+    _timer: rclrs::Timer,
 }
-
 ```
 
-### 4. Dependency Injection (The Constructor)
+The underscore fields exist because dropping them would stop the system (RAII keep-alive).
 
-This is where we wire the parts together.
+---
 
-```rust
-pub fn new(executor: &Executor) -> Result<Self, RclrsError> {
-    // ... create node and params ...
+## Why This Lesson Matters
 
-    // Step A: Instantiate the Component
-    // We build the "Brain" first.
-    let publisher = Arc::new(Self::build_chatter_publisher(&node)?);
-    
-    // Step B: Inject into Timer
-    // We clone the Arc (cheap pointer copy) and pass it to the timer builder.
-    // The timer now has access to the component's logic (`on_tick`).
-    let timer = Self::build_timer(&node, Arc::clone(&publisher), period_param)?;
+Lesson 02 establishes the component boundary that later lessons depend on:
 
-    log_info!(node.logger(), "Lesson 02 node started...");
+* Lesson 03 will add a subscriber component without inflating the node struct.
+* Lesson 04+ will add services/actions using the same pattern.
+* Growth happens by adding components, not by expanding a single state object.
 
-    Ok(Self {node, _publisher_component: publisher, _timer: timer})
-}
+This is the point where the track shifts from “examples” to “maintainable systems”.
 
-```
+---
 
-### 5. The Builder Pattern (Configuring Resources)
+## One next step only
 
-We use a helper to keep the `new` function clean. Note the use of `utils_rust`.
-
-```rust
-fn build_chatter_publisher(node: &Node) -> Result<PublisherChatter, RclrsError> {
-    // ... logger setup ...
-
-    // Best Practice: Don't hardcode strings!
-    // We get the topic name from our shared utility library.
-    let topic_name = topics::chatter(node);
-
-    // Best Practice: Don't hardcode QoS!
-    // We load QoS from parameters (or defaults) via utility helpers.
-    // This allows us to change reliability at runtime.
-    let qos_profile = qos::from_parameters(node);
-
-    // Options.
-    let mut options = rclrs::PublisherOptions::new(topic_name.as_str());
-    options.qos = qos_profile;
-
-    // ... create and return ...
-}
-
-```
-
-**Why do we do this?**
-
-* **Single Source of Truth**: The `.msg` file is the definition of truth for data. The `utils_rust` library is the definition of truth for configuration.
-* **Scalability**: If you change the topic name in `utils_rust`, the entire system updates automatically.
-* **Interoperability**: Using standard ROS 2 interfaces ensures this Rust node can talk to a Python subscriber without any extra work.
+If this breakdown matches your intent, I’ll write the **Lesson 03 rclrs breakdown** using the *same component rule* (SubscriberChatter + Node container + reset tolerance + QoS contract) once your Lesson 03 code is finalized.

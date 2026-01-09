@@ -6,6 +6,6 @@ sanitize_environment
 
 
 echo "--> Building rclrs (Native Rust) Lessons..."
-# Builds rclrs lessons 01 and 02
-colcon build --packages-select lesson_01_node_rclrs lesson_02_publisher_rclrs
+# Builds rclrs lessons 01, 02, and 03
+colcon build --packages-select lesson_01_node_rclrs lesson_02_publisher_rclrs lesson_03_subscriber_rclrs
 echo "rclrs Lessons built."
