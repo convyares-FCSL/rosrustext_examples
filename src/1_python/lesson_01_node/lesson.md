@@ -47,9 +47,18 @@ ros2 run lesson_01_node_py lesson_01_node --ros-args -p timer_period_s:=0.2
 
 In another terminal (with the same ROS + workspace sourced):
 
+Get node list:
 ```bash
-ros2 node list
+ros2 node list  
+```
+
+Get parameter list:
+```bash
 ros2 param list /lesson_01_node
+```
+
+Get parameter value:
+```bash
 ros2 param get /lesson_01_node timer_period_s
 ```
 

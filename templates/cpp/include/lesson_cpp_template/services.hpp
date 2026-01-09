@@ -1,7 +1,8 @@
 #pragma once
+#include <string>
 
-namespace services {
-
-// TODO: define service names for your package.
-
-}  // namespace services
+namespace lesson_cpp_template::services
+{
+    // << FILL IN HERE >>: Define service names as constants
+    // static constexpr char ADD_INTS[] = "add_two_ints";
+}

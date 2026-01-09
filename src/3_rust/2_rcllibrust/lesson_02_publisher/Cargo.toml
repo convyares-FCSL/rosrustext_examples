@@ -1,13 +1,12 @@
 [package]
-name = "lesson_02_publisher_rcllibrust"
+name = "lesson_02_pub_rcllibrust"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-roslibrust = { git = "https://github.com/RosLibRust/roslibrust", package = "roslibrust", features = ["rosbridge"] }
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "signal"] }
+roslibrust = { version = "0.18", features = ["rosbridge"] }
+tokio = { version = "1", features = ["full"] }
+log = "0.4"
 env_logger = "0.11"
-utils_rcllibrust = { path = "../../utils_rust" }
-
-[build-dependencies]
-roslibrust = { git = "https://github.com/RosLibRust/roslibrust", package = "roslibrust", features = ["codegen"] }
+serde = { version = "1.0", features = ["derive"] }
+utils_roslibrust = { path = "../utils_roslibrust" }

@@ -1,7 +1,0 @@
-[package]
-name = "utils_rcllibrust"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-roslibrust = { git = "https://github.com/RosLibRust/roslibrust", package = "roslibrust", features = ["rosbridge"] }

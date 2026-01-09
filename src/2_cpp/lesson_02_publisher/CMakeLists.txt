@@ -7,18 +7,18 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(std_msgs REQUIRED)
 find_package(utils_cpp REQUIRED)
+find_package(lesson_interfaces REQUIRED)
 
-add_executable(lesson_02_publisher src/publisher_node.cpp)
-target_include_directories(lesson_02_publisher PUBLIC
+add_executable(node src/lesson_02_publisher.cpp)
+target_include_directories(node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
-ament_target_dependencies(lesson_02_publisher rclcpp std_msgs utils_cpp)
-target_compile_features(lesson_02_publisher PUBLIC cxx_std_17)
+ament_target_dependencies(node rclcpp utils_cpp lesson_interfaces)
+target_compile_features(node PUBLIC cxx_std_17)
 
-install(TARGETS lesson_02_publisher
+install(TARGETS node
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
