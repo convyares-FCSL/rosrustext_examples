@@ -6,6 +6,6 @@ sanitize_environment
 
 
 echo "--> Building C++ Lessons..."
-# Builds C++ lessons 01 and 02
-colcon build --packages-select lesson_01_node_cpp lesson_02_publisher_cpp
+# Builds C++ lessons 01, 02, and 03
+colcon build --packages-select lesson_01_node_cpp lesson_02_publisher_cpp lesson_03_subscriber_cpp
 echo "C++ Lessons built."

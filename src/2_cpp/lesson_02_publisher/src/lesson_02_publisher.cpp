@@ -47,7 +47,7 @@ void Lesson02Node::setup_timer(){
   // Reset timer and create a new one
   timer_.reset();
   auto period = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(timer_period_s_));
-  timer_ = this->create_wall_timer(period, std::bind(&Lesson02Node::on_tick, this));  
+  timer_ = this->create_wall_timer(period, [this]() { this->on_tick();});
 }
 
 // Timer callback

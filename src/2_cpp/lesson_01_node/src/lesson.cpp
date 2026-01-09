@@ -41,7 +41,7 @@ void Lesson01Node::start_timer_from_param()
   timer_.reset();
 
   // Create the timer
-  timer_ = this->create_wall_timer(period, std::bind(&Lesson01Node::on_tick, this));
+  timer_ = this->create_wall_timer(period, [this]() { this->on_tick();});
 }
 
 // Timer callback

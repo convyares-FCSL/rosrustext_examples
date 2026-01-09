@@ -1,18 +1,26 @@
+Brief overview
+Yep — the breakdown needs one targeted correction: replace the `std::bind` explanation with **lambda callback** rationale, and tighten the “type safety” story to what’s actually true in `rclcpp` (compile-time signature + parameter type enforcement).
+
+Below is an updated breakdown section (full file) that matches your current Lesson 01 code exactly.
+
+---
+
 # Lesson 01 Breakdown: The Event Loop & Parameters (C++)
 
 ## Architecture: The Event-Driven Node
 
 In Lesson 00, we spun the node once and exited. In Lesson 01, the node enters an **Event Loop**.
 
+1. **Configuration**: The node declares and reads a **Parameter** (`timer_period_s`) at startup.
+2. **Scheduling**: It registers a **Timer** with the Executor using `create_wall_timer`.
+3. **Spinning**: The `main` function blocks on `rclcpp::spin()`. It sleeps until the timer fires, wakes up to run `on_tick()`, and repeats.
 
-
-1.  **Configuration**: The node declares and reads a **Parameter** (`timer_period_s`) at startup.
-2.  **Scheduling**: It registers a **Timer** with the Executor using `create_wall_timer`.
-3.  **Spinning**: The `main` function blocks on `rclcpp::spin()`. It sleeps until the timer fires, wakes up to run `on_tick()`, and repeats.
+---
 
 ## Code Walkthrough
 
 ### 1. The Header (`lesson.hpp`)
+
 We define the member variables and methods. Notice the usage of standard types.
 
 ```cpp
@@ -20,77 +28,111 @@ private:
   // Internal state
   double timer_period_s_{1.0};
   std::uint64_t tick_{0};
-  
+
   // Timer Handle
   // We must hold this shared_ptr. If it goes out of scope, the timer is destroyed.
   rclcpp::TimerBase::SharedPtr timer_;
-
 ```
 
-* **`rclcpp::TimerBase::SharedPtr`**: This is the standard handle type for timers in ROS 2 C++.
+* **`rclcpp::TimerBase::SharedPtr`**: Standard ROS 2 C++ handle type for timers.
+* **Lifetime rule**: If `timer_` is destroyed, the timer stops firing. This catches a lot of “why isn’t my callback running?” bugs.
+
+---
 
 ### 2. Parameter Declaration (`lesson.cpp`)
 
-In the constructor, we declare the parameter before we can use it.
+In the constructor, we declare the parameter before we can use it:
 
 ```cpp
-// "timer_period_s" is the name, 1.0 is the default value.
 this->declare_parameter<double>("timer_period_s", 1.0);
-
 ```
 
-* **Templated Type**: `<double>` enforces type safety. If a user tries to pass a string at the command line, ROS 2 will reject it.
+* **Templated type**: `<double>` is the contract. If a user tries to set it to an incompatible type via CLI, ROS 2 rejects it.
+* **Default value**: the node has deterministic behaviour even if no config is provided.
+
+---
 
 ### 3. The Setup Helper
 
-We use a helper method to keep the logic clean. This pattern is essential for C++ nodes that might need to "restart" timers dynamically.
+We use a helper method to keep the constructor clean. This pattern matters in real systems because it lets you recreate resources (timers, publishers, subscriptions) when config changes.
 
 ```cpp
 void Lesson01Node::start_timer_from_param()
 {
-  // 1. Get Value
   timer_period_s_ = this->get_parameter("timer_period_s").as_double();
 
-  // 2. Validation
   if (timer_period_s_ <= 0.0) {
-    RCLCPP_WARN(this->get_logger(), "Invalid period...");
+    RCLCPP_WARN(this->get_logger(), "timer_period_s=%.6f is invalid; using 1.0s", timer_period_s_);
     timer_period_s_ = 1.0;
   }
 
-  // 3. Time Conversion
-  // rclcpp timers expect std::chrono::duration types.
-  // We convert the double (seconds) into nanoseconds for precision.
   auto period = std::chrono::duration_cast<std::chrono::nanoseconds>(
     std::chrono::duration<double>(timer_period_s_));
 
-  // 4. Create Timer
-  // create_wall_timer(duration, callback)
-  // We use std::bind to link the member function 'on_tick' to 'this' instance.
-  timer_ = this->create_wall_timer(period, std::bind(&Lesson01Node::on_tick, this));
-}
+  timer_.reset();
 
+  timer_ = this->create_wall_timer(period, [this]() { this->on_tick(); });
+}
 ```
 
-**Why `std::chrono`?**
-ROS 2 is designed for real-time systems. Floating point math (`0.1 + 0.2`) usually results in precision errors. `std::chrono` handles time integers (nanoseconds) precisely, preventing drift in long-running control loops.
+#### Why `std::chrono`?
 
-### 4. The Main Loop
+ROS 2 timers expect `std::chrono::duration` types. Converting to nanoseconds is not “more real-time”; it’s about **precision and consistency**. You avoid accumulating floating point rounding errors in long-running loops.
 
-Unlike the manual `spin_some` from Lesson 00, we now use the blocking `spin`.
+#### Why a lambda instead of `std::bind`?
+
+Older ROS 2 examples used:
+
+```cpp
+std::bind(&Lesson01Node::on_tick, this)
+```
+
+A lambda is preferred because:
+
+* **Clearer**: the call is explicit (`this->on_tick()`), no placeholders, no mental parsing.
+* **Better type checking**: the compiler verifies the lambda’s call operator matches what `create_wall_timer` expects. With `std::bind`, you often end up with a callable object with a messier, less transparent type.
+* **Less error-prone captures**: `[this]` is explicit about what is being captured. `std::bind` can accidentally bind copies of values in surprising ways.
+* **Modern C++ norm**: lambdas are the idiomatic callback mechanism in current C++ codebases.
+
+In production code, “obvious is a feature.” Lambdas win.
+
+---
+
+### 4. The Timer Callback (`on_tick`)
+
+```cpp
+void Lesson01Node::on_tick()
+{
+  ++tick_;
+  RCLCPP_INFO(this->get_logger(), "tick %llu", static_cast<unsigned long long>(tick_));
+}
+```
+
+* **State mutation**: `tick_` is node-owned state; the callback is where event-driven state changes happen.
+* **Logging format**: we cast to `unsigned long long` to match the expected `printf` formatting and avoid UB (undefined behaviour).
+
+---
+
+### 5. The Main Loop
 
 ```cpp
 try {
   auto node = std::make_shared<Lesson01Node>();
-  
-  // BLOCKING CALL: Runs forever until Ctrl+C
   rclcpp::spin(node);
 
 } catch (const std::exception & e) {
-  // Global exception handler prevents core dumps on known errors
-  RCLCPP_ERROR(..., e.what());
+  RCLCPP_ERROR(rclcpp::get_logger("lesson_01_node_cpp"), "Exception in main: %s", e.what());
+  rclcpp::shutdown();
   return EXIT_FAILURE;
 }
-
 ```
 
-* **Exception Safety**: We wrap the spin in a `try/catch` block. If `on_tick` throws an exception (e.g., hardware failure), we catch it here and exit gracefully instead of crashing the entire process.
+* **Blocking behaviour**: `spin()` runs until shutdown (Ctrl+C or external shutdown).
+* **Exception safety**: a top-level `try/catch` prevents uncontrolled termination if something throws unexpectedly.
+* **Deterministic shutdown**: `rclcpp::shutdown()` ensures DDS resources are released cleanly.
+
+---
+
+## One next step only
+
+Replace any remaining `std::bind` usage in later C++ lessons (publishers/subscribers/timers) with lambdas to keep callback style consistent across the track.
