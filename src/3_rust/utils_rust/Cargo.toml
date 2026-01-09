@@ -1,7 +1,7 @@
 [package]
-name = "utils_rcllibrust"
+name = "utils_rust"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-roslibrust = { git = "https://github.com/RosLibRust/roslibrust", package = "roslibrust", features = ["rosbridge"] }
+rclrs = { git = "https://github.com/ros2-rust/ros2_rust", tag = "v0.6.0", package = "rclrs" }

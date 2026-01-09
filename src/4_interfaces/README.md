@@ -1,16 +1,22 @@
-# lesson_interfaces
+# Interfaces and Tools
 
-Shared message/service/action definitions for lessons.
+This directory contains shared ROS 2 interfaces and the tools required to generate bindings for them.
 
-Add new interface files under:
-- `msg/`
-- `srv/`
-- `action/`
+## Packages
 
-### Configuration
-Shared parameters live in `config/` and are split by type:
-- `config/topics_config.yaml` for topic names.
-- `config/services_config.yaml` for service names.
-- `config/qos_config.yaml` for QoS defaults and profile selection.
+- **`lesson_interfaces`**: Common messages, services, and actions for the tutorial.
+- **`rosidl_rust`**: Contains `rosidl_generator_rs`, the tool required to generate Rust definitions from `.msg` files.
 
-Then update `CMakeLists.txt` to include interfaces in `rosidl_generate_interfaces()`.
+## Usage in Rust
+
+To use `lesson_interfaces` in a Rust node:
+
+1.  **Enable Generator**: Ensure `lesson_interfaces/package.xml` has:
+    ```xml
+    <build_depend>rosidl_generator_rs</build_depend>
+    ```
+2.  **Dependencies**: In your node's `Cargo.toml`, point to the generated crate:
+    ```toml
+    [dependencies]
+    lesson_interfaces = { path = "../../../../install/lesson_interfaces/share/lesson_interfaces/rust" }
+    ```

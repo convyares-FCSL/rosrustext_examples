@@ -1,42 +1,51 @@
-use rclrs::{DurabilityPolicy, Node, QosProfile, ReliabilityPolicy};
+use std::sync::Arc;
+use rclrs::{QoSDurabilityPolicy, Node, QoSProfile, QoSReliabilityPolicy, MandatoryParameter, QoSHistoryPolicy};
 
 /// Create a QosProfile from ROS2 node parameters.
-pub fn from_parameters(node: &Node) -> QosProfile {
+pub fn from_parameters(node: &Node) -> QoSProfile {
     let profile = node
         .declare_parameter("qos.profile")
-        .default("telemetry")
-        .get::<String>()
+        .default(Arc::from("telemetry"))
+        .mandatory()
+        .map(|p: MandatoryParameter<Arc<str>>| p.get().to_string())
         .unwrap_or_else(|_| "telemetry".to_string());
-    let profile_key = normalize_profile(&profile);
+    _load_profile_impl(node, &profile)
+}
+
+fn _load_profile_impl(node: &Node, profile_name: &str) -> QoSProfile {
+   let profile_key = normalize_profile(profile_name);
     let defaults = defaults_for_profile(&profile_key);
     let base = format!("qos.profiles.{}.", profile_key);
     let rel = node
-        .declare_parameter(&(base.clone() + "reliability"))
-        .default(defaults.reliability)
-        .get::<String>()
+        .declare_parameter((base.clone() + "reliability").as_str())
+        .default(Arc::from(defaults.reliability))
+        .mandatory()
+        .map(|p: MandatoryParameter<Arc<str>>| p.get().to_string())
         .unwrap_or_else(|_| defaults.reliability.to_string());
     let durability = node
-        .declare_parameter(&(base.clone() + "durability"))
-        .default(defaults.durability)
-        .get::<String>()
+        .declare_parameter((base.clone() + "durability").as_str())
+        .default(Arc::from(defaults.durability))
+        .mandatory()
+        .map(|p: MandatoryParameter<Arc<str>>| p.get().to_string())
         .unwrap_or_else(|_| defaults.durability.to_string());
     let depth = node
-        .declare_parameter(&(base + "depth"))
+        .declare_parameter((base + "depth").as_str())
         .default(defaults.depth)
-        .get::<i64>()
+        .mandatory()
+        .map(|p: MandatoryParameter<i64>| p.get())
         .unwrap_or(defaults.depth);
 
-    let mut qos = QosProfile::default();
-    qos.depth = depth as usize;
+    let mut qos = QoSProfile::default();
+    qos.history = QoSHistoryPolicy::KeepLast { depth: depth as u32 };
     if rel == "best_effort" {
-        qos.reliability = ReliabilityPolicy::BestEffort;
+        qos.reliability = QoSReliabilityPolicy::BestEffort;
     } else {
-        qos.reliability = ReliabilityPolicy::Reliable;
+        qos.reliability = QoSReliabilityPolicy::Reliable;
     }
     if durability == "transient_local" {
-        qos.durability = DurabilityPolicy::TransientLocal;
+        qos.durability = QoSDurabilityPolicy::TransientLocal;
     } else {
-        qos.durability = DurabilityPolicy::Volatile;
+        qos.durability = QoSDurabilityPolicy::Volatile;
     }
     qos
 }

@@ -1,0 +1,13 @@
+[package]
+name = "lesson_02_publisher_rclrs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rclrs = { git = "https://github.com/ros2-rust/ros2_rust", tag = "v0.6.0", package = "rclrs" }
+utils_rust = { path = "../../utils_rust" }
+lesson_interfaces = { path = "../../../../install/lesson_interfaces/share/lesson_interfaces/rust" }
+
+[[bin]]
+name = "lesson_02_node"
+path = "src/main.rs"

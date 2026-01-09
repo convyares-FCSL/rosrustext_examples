@@ -51,3 +51,4 @@ Cargo.lock
 .output.txt
 .cargo/
 /secret/
+capstone

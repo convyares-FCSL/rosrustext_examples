@@ -1,50 +1,52 @@
 use std::time::Duration;
+use rclrs::{log_info, Context, CreateBasicExecutor, Executor, Node, RclrsError, SpinOptions};
 
-use rclrs::{log_info, Context, CreateBasicExecutor, Executor, Node, RclrsError, RclrsErrorFilter, SpinOptions};
-
+/// Node name.
 const NODE_NAME: &str = "lesson_00_bootstrap";
 
-// Struct representing the bootstrap node.
-struct BootstrapNode {
-    node: Node,
+/// Lesson00Node: The container.
+/// In ROS 2 Rust, we wrap the Node in a struct to manage its lifetime 
+/// and the lifetimes of its resources (timers, publishers, subscribers).
+struct Lesson00Node {
+    /// Public: accessible for logging in main()
+    pub node: Node,
 }
 
-// Implementation block for the BootstrapNode struct.
-impl BootstrapNode {
-    // Constructor: create the node and log startup.
+/// Implementation block for the Lesson00Node struct.
+impl Lesson00Node {
+    /// Constructor: Sets up the node and its resources.
     fn new(executor: &Executor) -> Result<Self, RclrsError> {
-        // Create the node using the executor's context.
+        // Create the node instance within the executor's context
         let node = executor.create_node(NODE_NAME)?;
 
-        // Log an informational message indicating the node has started.
+        // Log startup to console (stdout)
         log_info!(node.logger(), "Lesson 00 bootstrap node started...");
 
-        // Return the constructed node.
         Ok(Self { node })
     }
 }
 
-// Main function: entry point of the program.
+/// Main function.
 fn main() -> Result<(), RclrsError> {
-    // Initialize the ROS 2 context from environment variables.
+    // 1. Initialize the ROS 2 context (middleware communication)
     let context = Context::default_from_env()?;
 
-    // Create an executor that will own and spin our callbacks.
+    // 2. Create the executor (handles the event loop)
     let mut executor = context.create_basic_executor();
 
-    // Create the node via a constructor, mirroring the rclpy pattern.
-    let bootstrap = BootstrapNode::new(&executor)?;
+    // 3. Create our Node Container
+    let node = Lesson00Node::new(&executor)?;
 
-    // Spin the executor, handling errors appropriately.
+    // 4. Spin Once: Run the loop one time to check for immediate work, then exit.
+    // This confirms the node can bootstrap successfully without hanging.
     executor
         .spin(SpinOptions::spin_once().timeout(Duration::from_millis(0)))
         .ignore_non_errors()
         .first_error()
         .map_err(|err| {
-            rclrs::log_error!(bootstrap.node.logger(), "Executor stopped with error: {err}");
+            rclrs::log_error!(node.node.logger(), "Executor stopped with error: {err}");
             err
         })?;
 
-    // Return success.
     Ok(())
 }

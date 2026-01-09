@@ -57,7 +57,7 @@ void Lesson02Node::on_tick()
   ++tick_;
 
   // Create message and publish
-  lesson_interfaces::msg::MsgCount msg;
+  MsgCount msg;
   msg.count = tick_;
   publisher_->publish(msg);
 }
