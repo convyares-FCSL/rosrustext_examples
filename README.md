@@ -11,11 +11,10 @@ so that behaviour, naming, and configuration patterns can be compared directly.
 
 ## Goals
 
-- Provide a consistent lesson sequence across Python, C++, rclrs, and rcllibrust.
-- Keep examples minimal, readable, and stylistically aligned across languages.
-- Use the same topic, service, and action names to enable cross-language comparison.
-- Introduce professional configuration and bringup patterns without hiding fundamentals.
-- Make language trade-offs explicit where they matter.
+- **Parity**: Provide a consistent lesson sequence across Python, C++, and Rust.
+- **Simplicity vs. Reality**: Keep examples minimal but use production patterns (containers, lifecycle, configuration).
+- **Consistency**: Use the same topic, service, and action names to enable cross-language comparison.
+- **Explicit Trade-offs**: Make language trade-offs explicit (e.g., Latency vs. Dev Speed) via benchmarks.
 
 ---
 
@@ -23,53 +22,43 @@ so that behaviour, naming, and configuration patterns can be compared directly.
 
 ```text
 src/
-├─ 1_python/
-│  ├─ lesson_00_bootstrap
-│  ├─ lesson_01_node
-│  ├─ lesson_0x_xxxx
-│  └─ utils_py
+├─ 1_python/              # Python lessons (rclpy)
+│   ├─ lesson_00_bootstrap
+│   ├─ lesson_01_node
+│   └─ lesson_02_publisher
 │
-├─ 2_cpp/
-│  ├─ lesson_00_bootstrap
-│  ├─ lesson_01_node
-│  ├─ lesson_0x_xxxx
-│  └─ utils_cpp
+├─ 2_cpp/                 # C++ lessons (rclcpp)
+│   ├─ lesson_00_bootstrap
+│   ├─ lesson_01_node
+│   └─ lesson_02_publisher
 │
 ├─ 3_rust/
-│  ├─ 1_rclrs/
-│  │  ├─ lesson_00_bootstrap
-│  │  ├─ lesson_01_node
-│  │  ├─ lesson_0x_xxxx
-│  │
-│  ├─ 2_rcllibrust/
-│  │  ├─ lesson_00_bootstrap
-│  │  ├─ lesson_01_node
-│  │  ├─ lesson_0x_xxxx
-│  │
-│  └─ utils_rust
+│   ├─ 1_rclrs/           # Native Rust Nodes (Primary Track)
+│   └─ 2_rcllibrust/      # Rust Client/Bridge (Secondary Track)
 │
-├─ 4_interfaces/
-│  ├─ config/
-│  │  ├─ topics_config.yaml
-│  │  ├─ qos_config.yaml
-│  │  └─ services_config.yaml
-│  ├─ msg/
-│  ├─ srv/
-│  └─ action/
+├─ 4_interfaces/          # Shared Definitions
+│   ├─ msg/               # e.g., MsgCount.msg
+│   └─ config/            # Shared .yaml configuration
 │
-├─ 5_benchmark/
-│  └─ README.md
+├─ 5_benchmark/           # Engineering Studies (Latency/Jitter)
+│   └─ README.md
 │
-templates/
-````
+templates/                # Starter boilerplate for new packages
 
-Notes:
+```
 
-* Numeric prefixes (`1_`, `2_`, `3_`, `4_`, `5_`) are intentional and reflect increasing
-  conceptual and architectural complexity.
-* `rcllibrust` examples are **Cargo-only** and excluded from `colcon` via `COLCON_IGNORE`.
-* Shared message, service, action, and configuration files live in `4_interfaces`.
-* Benchmarks live in `5_benchmark` and are **not** part of the core lesson flow.
+---
+
+## Architectural Progression
+
+Unlike tutorials that use simple scripts, this workspace teaches scalable patterns from day one:
+
+1. **Lesson 00 (The Container)**:
+Wraps the Node in a Class/Struct to manage lifecycle (RAII). Ensures clean shutdown and prevents "zombie nodes."
+2. **Lesson 01 (The Event Loop)**:
+Introduces shared state (Atomic counters in Rust, Class members in Python/C++) and timer scheduling.
+3. **Lesson 02 (Composition)**:
+Separates **Logic** (Business Components) from **Lifecycle** (The Node). Introduces dependency injection and **Custom Interfaces**.
 
 ---
 
@@ -77,193 +66,81 @@ Notes:
 
 ### Lesson 00 – Workspace bootstrap
 
-* One minimal package per language.
-* Build and run verification only.
-* Confirms toolchains and environment are working.
+* **Goal**: One minimal package per language.
+* **Focus**: Build tooling (`colcon` vs `cargo`) and environment verification.
 
 ### Lesson 01 – Simple node
 
-* Node creation.
-* Timer + logging only.
-* Clean startup and shutdown.
+* **Goal**: Continuous execution with a 1Hz timer.
+* **Focus**: Parameter declaration, timer scheduling, and safe state mutation.
 
 ### Lesson 02 – Publisher
 
-* Publish `std_msgs/String` on `chatter`.
-* Parameter for publish rate.
-* Uses shared configuration from:
+* **Goal**: Publish a custom `MsgCount` message on a shared topic.
+* **Focus**:
+* Defining `.msg` files in `lesson_interfaces`.
+* Using shared utility libraries (`utils_py`, `utils_rust`) for configuration.
+* **Composition**: Moving logic out of the main node class.
 
-  * `topics_config.yaml`
-  * `qos_config.yaml`
 
-### Lesson 03 – Subscriber
 
-* Subscribe to `chatter`.
-* QoS selection and logging.
-* Uses the same shared configuration files as Lesson 02.
+### Lesson 03 – Subscriber (Planned)
 
-### Lesson 04 – Services
+* **Goal**: Subscribe to `chatter` and log data.
+* **Focus**: QoS matching (Reliable vs Best Effort) and callback concurrency.
 
-* `example_interfaces/srv/AddTwoInts` server and client.
-* Input validation and error handling.
+### Lesson 04 – Services (Planned)
 
-### Lesson 05 – Parameters
-
-* Declare and validate parameters.
-* Runtime updates via callbacks.
-
-### Lesson 06 – Lifecycle publisher
-
-* Lifecycle-enabled node.
-* Publisher created on configure.
-* Publish only when active; disabled on deactivate.
-
-### Lesson 07 – Actions
-
-* `CountUntil` action server and client.
-* Feedback, result, and cancel handling.
-
-### Lesson 08 – Executors and callback groups (optional)
-
-* Multi-threaded executors.
-* Callback group isolation.
-* Non-blocking patterns.
-
-### Lesson 09 – Launch files and configuration discovery
-
-* Basic launch files.
-* Developer-mode configuration (source tree).
-* Installed configuration discovery using package share paths.
-* Demonstrates why hardcoding `src/...` paths does not scale.
-
-### Lesson 10 – Capstone (placeholder)
-
-* Links to a **separate capstone project**.
-* Demonstrates:
-
-  * Multi-language systems (Python, C++, Rust together)
-  * Bringup packages and launch trees
-  * Lifecycle nodes and lifecycle managers
-  * Shared interfaces and shared configuration
-  * Professional error handling and naming conventions
-
----
-
-## Configuration Pattern
-
-Shared configuration lives in:
-
-```text
-src/4_interfaces/config/
-```
-
-* `topics_config.yaml` – topic names
-* `qos_config.yaml` – QoS profiles and defaults
-* `services_config.yaml` – service names
-
-Language-specific utility libraries (`utils_py`, `utils_cpp`, `utils_rust`)
-handle parameter declaration and retrieval so lesson code stays focused on behaviour.
-
-This pattern prepares the workspace for later lessons involving launch files
-and multi-language bringup.
-
----
-
-## Benchmark Track (Optional)
-
-`src/5_benchmark` contains **optional benchmarking material** comparing
-communication latency, jitter, and throughput across languages.
-
-This track is:
-
-* Not required to complete the lessons
-* Environment-dependent
-* Intended to highlight **trade-offs**, not declare winners
+* **Goal**: `example_interfaces/srv/AddTwoInts` server and client.
+* **Focus**: Input validation and asynchronous service calls.
 
 ---
 
 ## Templates
 
-Starter templates live in `templates/` and are intended to be copied into `src/`:
+Starter templates live in the `templates/` directory. They provide the minimal boilerplate required to start a new lesson with the correct build configuration.
 
-* `templates/python`
-* `templates/cpp`
-* `templates/rclrs`
-* `templates/rcllibrust`
+* `templates/python`: `setup.py`, `package.xml`, and node skeleton.
+* `templates/cpp`: `CMakeLists.txt` and `package.xml` with standard dependencies.
+* `templates/rclrs`: `Cargo.toml` configured for `rosidl` generation dependencies.
 
-Templates provide:
-
-* Minimal boilerplate
-* Consistent naming
-* Correct build configuration per language
+To use one, copy it into `src/` and rename the folders.
 
 ---
 
-## Lesson readme
+## Configuration Pattern
 
-Each lesson directory contains a `Lesson.md` describing:
+We do **not** hardcode strings (e.g., `"chatter"`) inside Node code.
 
-* The goal
-* Build steps
-* Run steps
+* **Definitions**: `src/4_interfaces/config/` (YAML files).
+* **Access**: Language-specific helpers (`utils_py`, `utils_cpp`, `utils_rust`).
 
-## Lanaguage Notes
-
-### Python Notes
-
-* Python lessons use `rclpy` and follow standard ROS 2 node patterns.
-* Logging uses ROS logging (`get_logger()`), publishing to `/rosout`.
-* Python is well suited for:
-
-  * orchestration
-  * supervision
-  * configuration management
-  * rapid iteration
-* Python is **not** ideal for:
-
-  * high-frequency, low-jitter loops
-  * hard real-time behaviour
-* Garbage collection and interpreter scheduling introduce observable jitter.
-* Clean shutdown requires explicit handling of timers, callbacks, and executors.
-
-Python lessons prioritise **clarity and correctness** over performance.
+This pattern allows topic names and QoS profiles to be changed system-wide by editing a single line of config, rather than hunting through source code.
 
 ---
 
-### C++ Notes
+## Language Notes
 
-* C++ lessons use `rclcpp` and the default ROS 2 execution model.
-* Logging uses ROS logging and integrates fully with `/rosout`.
-* C++ offers:
+### Python (`rclpy`)
 
-  * lowest latency floor
-  * best control over executors, memory, and QoS
-  * mature ROS ecosystem support
-* C++ also brings:
+Optimized for orchestration and rapid iteration.
 
-  * higher complexity
-  * longer compile times
-  * more responsibility for correctness
-* Lifecycle nodes and executor tuning are most explicit in C++.
+* **See**: [src/1_python/README.md](https://www.google.com/search?q=src/1_python/README.md) for build tips (`--symlink-install`).
 
-C++ lessons demonstrate **canonical ROS 2 patterns** and are treated as the
-reference implementation when behaviour must be unambiguous.
+### C++ (`rclcpp`)
+
+The reference implementation offering the lowest latency and most manual control.
+
+* **See**: [src/2_cpp/README.md](https://www.google.com/search?q=src/2_cpp/README.md) for header/source split details.
+
+### Rust (`rclrs`)
+
+Native Rust bindings focusing on memory safety and correctness.
+
+* **See**: [src/3_rust/README.md](https://www.google.com/search?q=src/3_rust/README.md) for critical build dependency instructions (`../../install/...`).
 
 ---
 
-### Rust Notes (existing, unchanged but contextualised)
+## Benchmarks
 
-* rclrs provides ROS-native Rust bindings.
-* rcllibrust is a client/bridge library and does **not** behave like a ROS node.
-* Rust emphasises:
-
-  * memory safety
-  * explicit ownership
-  * predictable long-running behaviour
-* Rust logging differs:
-
-  * `rclrs` → ROS logging
-  * `rcllibrust` → standard Rust logging (`log` + `env_logger`)
-* The Rust ecosystem for ROS is newer and intentionally conservative.
-
-Rust lessons focus on **correctness, structure, and long-term reliability**.
+The `src/5_benchmark` directory contains optional studies on latency and jitter. These are **not** lessons but engineering references to help you choose the right language for a specific subsystem.

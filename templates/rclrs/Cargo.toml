@@ -1,7 +1,17 @@
 [package]
+# << FILL IN HERE >>: Name your package (must match folder name)
 name = "lesson_rclrs_template"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rclrs = { git = "https://github.com/ros2-rust/ros2_rust", tag = "v0.6.0", package = "rclrs" }
+# We pin to a specific tag of ros2_rust to ensure stability.
+rclrs = { git = "https://github.com/ros2-rust/ros2_rust", tag = "0.4.1" }
+serde = { version = "1", features = ["derive"] }
+
+# << FILL IN HERE >>: Uncomment if using custom messages from lesson_interfaces
+# Critical: Points to the *installed* generated bindings, not source.
+# lesson_interfaces = { path = "../../../../install/lesson_interfaces/share/lesson_interfaces/rust" }
+
+# << FILL IN HERE >>: Uncomment if using standard ROS messages (e.g. String)
+# std_msgs = { git = "https://github.com/ros2-rust/ros2_rust", tag = "0.4.1" }
