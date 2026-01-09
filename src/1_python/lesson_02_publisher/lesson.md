@@ -17,7 +17,7 @@ From the workspace root:
 
 ```bash
 cd ~/ros2_ws_tutorial
-colcon build --packages-select lesson_02_node_py --symlink-install
+colcon build --packages-select lesson_02_publisher_py --symlink-install
 source install/setup.bash
 ```
 
@@ -26,7 +26,7 @@ source install/setup.bash
 ## Run
 
 ```bash
-ros2 run lesson_02_node_py lesson_02_node
+ros2 run lesson_02_publisher_py lesson_02_publisher
 ```
 
 **Expected output:**
@@ -66,7 +66,7 @@ Look for `Node name: lesson_02_node` and verify the QoS profile matches `qos_con
 Change the publish rate without editing code:
 
 ```bash
-ros2 run lesson_02_node_py lesson_02_node --ros-args -p timer_period_s:=0.2
+ros2 run lesson_02_publisher_py lesson_02_publisher --ros-args -p timer_period_s:=0.2
 ```
 
 ---

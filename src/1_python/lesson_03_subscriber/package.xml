@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="3">
-  <name>lesson_02_publisher_py</name>
+  <name>lesson_03_subscriber_py</name>
   <version>0.1.0</version>
-  <description>Lesson 02 (Python): simple publisher node.</description>
+  <description>Lesson 03 (Python): simple subscriber node.</description>
   <maintainer email="you@example.com">Your Name</maintainer>
   <license>Apache-2.0</license>
 

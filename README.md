@@ -55,12 +55,15 @@ Unlike tutorials that use simple scripts, this workspace teaches scalable patter
 
 1. **Lesson 00 (The Container)**:
 Wraps the Node in a Class/Struct to manage lifecycle (RAII). Ensures clean shutdown and prevents "zombie nodes."
+
 2. **Lesson 01 (The Event Loop)**:
 Introduces shared state (Atomic counters in Rust, Class members in Python/C++) and timer scheduling.
-3. **Lesson 02 (Composition)**:
-Separates **Logic** (Business Components) from **Lifecycle** (The Node). Introduces dependency injection and **Custom Interfaces**.
 
----
+3. **Lesson 02 (Composition)**:
+Separates **Logic** (application behaviour) from **Lifecycle** (ROS resource ownership). Introduces dependency injection and **Custom Interfaces**.
+
+4. **Lesson 03 (System Verification)**:
+Validates language-agnostic communication, QoS compatibility, and stream robustness (late joiners, restarts, resets). Introduces logic injection for subscriber callbacks and transport-aware validation.
 
 ---
 
@@ -84,12 +87,13 @@ Separates **Logic** (Business Components) from **Lifecycle** (The Node). Introdu
 * Using shared utility libraries (`utils_py`, `utils_rclrs`, `utils_roslibrust`) for configuration.
 * **Composition**: Moving logic out of the main node class.
 
+### Lesson 03 – Subscriber (Implemented)
 
-
-### Lesson 03 – Subscriber (Planned)
-
-* **Goal**: Subscribe to `chatter` and log data.
-* **Focus**: QoS matching (Reliable vs Best Effort) and callback concurrency.
+* **Goal**: Verify cross-language message flow using a shared interface.
+* **Focus**:
+  * QoS compatibility as a configuration concern
+  * Late-joiner handling and publisher reset tolerance
+  * Logic injection for subscriber callbacks
 
 ### Lesson 04 – Services (Planned)
 

@@ -1,6 +1,6 @@
 from setuptools import setup
 
-package_name = "lesson_02_publisher_py"
+package_name = "lesson_03_subscriber_py"
 
 setup(
     name=package_name,
@@ -14,12 +14,12 @@ setup(
     zip_safe=True,
     maintainer="Your Name",
     maintainer_email="you@example.com",
-    description="Lesson 02 (Python): simple publisher node.",
+    description="Lesson 03 (Python): simple subscriber node.",
     license="Apache-2.0",
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [
-            "lesson_02_node = lesson_02_publisher_py.node:main",
+            "lesson_03_subscriber = lesson_03_subscriber_py.node:main",
         ],
     },
 )
