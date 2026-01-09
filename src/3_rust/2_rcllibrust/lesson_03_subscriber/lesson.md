@@ -52,6 +52,7 @@ RUST_LOG=info cargo run
 ```text
 [INFO] Connected to ws://localhost:9090
 [INFO] Lesson 03 node started (subscriber). Ctrl+C to exit.
+
 ```
 
 The node remains quiet until it receives data. This is normal subscriber behaviour.
@@ -127,6 +128,7 @@ Verify that:
 
 * A node (likely unnamed or auto-named by the bridge) is listed as a subscriber.
 * QoS settings match those defined by `utils_roslibrust`.
+
 ---
 
 ## Notes

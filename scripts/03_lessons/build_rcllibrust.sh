@@ -17,4 +17,9 @@ cd src/3_rust/2_rcllibrust/lesson_02_publisher
 cargo build
 cd - > /dev/null
 
+echo "    Building lesson_03_subscriber..."
+cd src/3_rust/2_rcllibrust/lesson_03_subscriber
+cargo build
+cd - > /dev/null
+
 echo "rcllibrust Lessons built."
