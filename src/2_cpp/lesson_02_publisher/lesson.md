@@ -17,7 +17,7 @@ From the workspace root:
 
 ```bash
 cd ~/ros2_ws_tutorial
-colcon build --packages-select lesson_02_publisher
+colcon build --packages-select lesson_02_publisher_cpp
 source install/setup.bash
 ```
 
@@ -26,7 +26,7 @@ source install/setup.bash
 ## Run
 
 ```bash
-ros2 run lesson_02_publisher node
+ros2 run lesson_02_publisher_cpp node
 ```
 
 **Expected output:**
@@ -65,7 +65,7 @@ Look for `Node name: lesson_02_node` and verify the QoS profile matched defaults
 Change the publish rate without editing code:
 
 ```bash
-ros2 run lesson_02_publisher node --ros-args -p timer_period_s:=0.2
+ros2 run lesson_02_publisher_cpp node --ros-args -p timer_period_s:=0.2
 ```
 
 ---

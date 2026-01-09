@@ -18,7 +18,8 @@ struct Lesson01Node {
     pub node: Node,
 
     // We must hold this handle. If this field is dropped, the timer stops.
-    _timer: Arc<rclrs::Timer>, 
+    // Note: rclrs::Timer is internally an Arc, so we hold it directly.
+    _timer: rclrs::Timer, 
 }
 
 ```
@@ -59,7 +60,7 @@ fn build_timer(
     node: &Node, 
     count: Arc<AtomicU64>, // Takes ownership of one Arc clone
     period_param: MandatoryParameter<f64>
-) -> Result<Arc<rclrs::Timer>, RclrsError> {
+) -> Result<rclrs::Timer, RclrsError> {
     
     // Step A: Read Parameter
     let mut period_s = period_param.get();

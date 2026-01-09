@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use rclrs::{
     log_info, Context, CreateBasicExecutor, Executor, MandatoryParameter, Node, RclrsError,
-    SpinOptions,
+    SpinOptions, RclrsErrorFilter,
 };
 
 const NODE_NAME: &str = "lesson_01_node";
@@ -13,8 +13,8 @@ const NODE_NAME: &str = "lesson_01_node";
 struct Lesson01Node {
     pub node: Node,
 
-    // We must hold this handle. If this field is dropped, the timer stops.
-    _timer: Arc<rclrs::Timer>, 
+    // FIX: rclrs::Timer is already an Arc, so we don't need Arc<rclrs::Timer>
+    _timer: rclrs::Timer, 
 }
 
 /// Implementation block for the Lesson01Node struct.
@@ -42,7 +42,8 @@ impl Lesson01Node {
     }
 
     /// Helper to construct the timer logic.
-    fn build_timer(node: &Node, count: Arc<AtomicU64>, period_param: MandatoryParameter<f64>) -> Result<Arc<rclrs::Timer>, RclrsError> {
+    // FIX: Return type is rclrs::Timer (which is already an Arc wrapper internally)
+    fn build_timer(node: &Node, count: Arc<AtomicU64>, period_param: MandatoryParameter<f64>) -> Result<rclrs::Timer, RclrsError> {
         // Get the period.
         let mut period_s = period_param.get();
 

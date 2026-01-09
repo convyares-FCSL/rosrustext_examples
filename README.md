@@ -62,24 +62,26 @@ Separates **Logic** (Business Components) from **Lifecycle** (The Node). Introdu
 
 ---
 
+---
+
 ## Lesson Roadmap
 
-### Lesson 00 – Workspace bootstrap
+### Lesson 00 – Workspace bootstrap (Implemented)
 
 * **Goal**: One minimal package per language.
 * **Focus**: Build tooling (`colcon` vs `cargo`) and environment verification.
 
-### Lesson 01 – Simple node
+### Lesson 01 – Simple node (Implemented)
 
 * **Goal**: Continuous execution with a 1Hz timer.
 * **Focus**: Parameter declaration, timer scheduling, and safe state mutation.
 
-### Lesson 02 – Publisher
+### Lesson 02 – Publisher (Implemented)
 
 * **Goal**: Publish a custom `MsgCount` message on a shared topic.
 * **Focus**:
 * Defining `.msg` files in `lesson_interfaces`.
-* Using shared utility libraries (`utils_py`, `utils_rust`) for configuration.
+* Using shared utility libraries (`utils_py`, `utils_rclrs`, `utils_roslibrust`) for configuration.
 * **Composition**: Moving logic out of the main node class.
 
 
@@ -92,7 +94,32 @@ Separates **Logic** (Business Components) from **Lifecycle** (The Node). Introdu
 ### Lesson 04 – Services (Planned)
 
 * **Goal**: `example_interfaces/srv/AddTwoInts` server and client.
-* **Focus**: Input validation and asynchronous service calls.
+* **Focus**: Input validation, error handling, and asynchronous service calls.
+
+### Lesson 05 – Parameters (Planned)
+
+* **Goal**: Declare and validate parameters via `config/topics_config.yaml`.
+* **Focus**: Runtime updates via callbacks and "Source of Truth" configuration management.
+
+### Lesson 06 – Lifecycle publisher (Planned)
+
+* **Goal**: Lifecycle-enabled node (Managed Node).
+* **Focus**: Publisher created on `configure`, active only after `activate`.
+
+### Lesson 07 – Actions (Planned)
+
+* **Goal**: `CountUntil` action server and client.
+* **Focus**: Feedback loops, result handling, and cancellation logic.
+
+### Lesson 08 – Executors and callback groups (Planned)
+
+* **Goal**: Multi-threaded execution.
+* **Focus**: Callback group isolation and non-blocking patterns.
+
+### Lesson 09 – Launch files and configuration discovery (Planned)
+
+* **Goal**: Unified launch system.
+* **Focus**: Developer-mode configuration (source tree) vs. Installed configuration (package share), demonstrating why hardcoding paths fails in production.
 
 ---
 
@@ -113,7 +140,7 @@ To use one, copy it into `src/` and rename the folders.
 We do **not** hardcode strings (e.g., `"chatter"`) inside Node code.
 
 * **Definitions**: `src/4_interfaces/config/` (YAML files).
-* **Access**: Language-specific helpers (`utils_py`, `utils_cpp`, `utils_rust`).
+* **Access**: Language-specific helpers (`utils_py`, `utils_cpp`, `utils_rclrs`, `utils_roslibrust`).
 
 This pattern allows topic names and QoS profiles to be changed system-wide by editing a single line of config, rather than hunting through source code.
 
@@ -125,22 +152,30 @@ This pattern allows topic names and QoS profiles to be changed system-wide by ed
 
 Optimized for orchestration and rapid iteration.
 
-* **See**: [src/1_python/README.md](https://www.google.com/search?q=src/1_python/README.md) for build tips (`--symlink-install`).
+* **See**: `src/1_python/README.md` for build tips (`--symlink-install`).
 
 ### C++ (`rclcpp`)
 
 The reference implementation offering the lowest latency and most manual control.
 
-* **See**: [src/2_cpp/README.md](https://www.google.com/search?q=src/2_cpp/README.md) for header/source split details.
+* **See**: `src/2_cpp/README.md` for header/source split details.
 
 ### Rust (`rclrs`)
 
 Native Rust bindings focusing on memory safety and correctness.
 
-* **See**: [src/3_rust/README.md](https://www.google.com/search?q=src/3_rust/README.md) for critical build dependency instructions (`../../install/...`).
+* **See**: `src/3_rust/README.md` for critical build dependency instructions (`../../install/...`).
 
 ---
 
 ## Benchmarks
 
 The `src/5_benchmark` directory contains optional studies on latency and jitter. These are **not** lessons but engineering references to help you choose the right language for a specific subsystem.
+
+---
+
+## Workspace Automation
+
+For advanced users or CI/CD purposes, this workspace includes helper scripts to build the entire project in a deterministic order.
+
+*   **See**: [scripts/README.md](scripts/README.md) for details on bulk building and cleaning the workspace.

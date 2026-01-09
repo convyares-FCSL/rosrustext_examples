@@ -1,5 +1,5 @@
 use std::sync::{Arc, Mutex};
-use rclrs::{Context, Executor, Node, RclrsError, SpinOptions};
+use rclrs::{Context, Executor, Node, RclrsError, SpinOptions, RclrsErrorFilter};
 
 // Helper modules for shared configuration
 // mod qos;

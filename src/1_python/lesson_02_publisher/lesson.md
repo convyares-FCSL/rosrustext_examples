@@ -48,9 +48,9 @@ ros2 topic echo /chatter
 ### 2. Inspect message structure
 Check the field definition of the custom message (`MsgCount.msg`):
 ```bash
-ros2 interface show interfaces/msg/MsgCount
+ros2 interface show lesson_interfaces/msg/MsgCount
 ```
-*(Note: Replace `interfaces` with the actual package name where the message is built)*
+*(Note: Replace `lesson_interfaces` with the actual package name where the message is built)*
 
 ### 3. Check publisher details
 Verify the node is publishing with the correct QoS settings (Reliability, Durability, etc.):
@@ -74,5 +74,5 @@ ros2 run lesson_02_node_py lesson_02_node --ros-args -p timer_period_s:=0.2
 ## Notes
 
 * **Topic & QoS**: Loaded from `src/1_python/utils_py/config` (not hardcoded).
-* **Message Type**: `MsgCount` (int) defined in `src/4_interfaces/msg/MsgCount.msg`.
+* **Message Type**: `MsgCount` (int) defined in `src/lesson_interfaces/msg/MsgCount.msg`.
 * **Behavior**: Defaults to 1.0s period if `timer_period_s` is not set.

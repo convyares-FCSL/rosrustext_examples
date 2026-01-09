@@ -53,8 +53,7 @@ ros2 run lesson_01_node_rclrs lesson_01_node_rclrs
 Expected output (shape):
 
 ```text
-[INFO] [lesson_01_node]: Timer running with period=1.000s
-[INFO] [lesson_01_node]: Lesson 01 node started (timer + logging). Ctrl+C to exit.
+[INFO] [lesson_01_node]: Lesson 01 node started...
 [INFO] [lesson_01_node]: tick 1
 [INFO] [lesson_01_node]: tick 2
 ...

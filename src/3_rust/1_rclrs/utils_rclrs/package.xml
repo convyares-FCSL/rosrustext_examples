@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="3">
-  <name>utils_rust</name>
+  <name>utils_rclrs</name>
   <version>0.1.0</version>
   <description>Shared utils for Rust lessons</description>
   <maintainer email="you@example.com">Your Name</maintainer>

@@ -1,5 +1,5 @@
 use std::time::Duration;
-use rclrs::{log_info, Context, CreateBasicExecutor, Executor, Node, RclrsError, SpinOptions};
+use rclrs::{log_info, Context, CreateBasicExecutor, Executor, Node, RclrsError, SpinOptions, RclrsErrorFilter};
 
 /// Node name.
 const NODE_NAME: &str = "lesson_00_bootstrap";

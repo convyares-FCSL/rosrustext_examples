@@ -3,13 +3,13 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use rclrs::{
-    log_info, Context, CreateBasicExecutor, Executor, MandatoryParameter, Node, RclrsError,
-    SpinOptions, Publisher, Logger,
+    log_info, Context, CreateBasicExecutor, Executor, MandatoryParameter, Node,
+    Publisher, RclrsError, RclrsErrorFilter, SpinOptions, Logger,
 };
 
 // Now use local dependencies.
 use lesson_interfaces::msg::MsgCount;
-use utils_rust::{qos, topics};
+use utils_rclrs::{qos, topics};
 
 
 const NODE_NAME: &str = "lesson_02_node";
@@ -43,7 +43,7 @@ struct Lesson02Node {
     pub node: Node,
     // The underscore prefix indicates these are held for RAII (keep-alive) purposes.
     _publisher_component: Arc<PublisherChatter>,
-    _timer: Arc<rclrs::Timer>, 
+    _timer: rclrs::Timer, 
 }
 
 /// Implementation block for the Lesson02Node struct.
@@ -86,7 +86,7 @@ impl Lesson02Node {
     }
 
     /// Helper to construct the timer logic. Same as in lesson 01 with added publisher struct.
-    fn build_timer(node: &Node, chatter: Arc<PublisherChatter>, period_param: MandatoryParameter<f64>) -> Result<Arc<rclrs::Timer>, RclrsError> {
+    fn build_timer(node: &Node, chatter: Arc<PublisherChatter>, period_param: MandatoryParameter<f64>) -> Result<rclrs::Timer, RclrsError> {
         let mut period_s = period_param.get();
         if !period_s.is_finite() || period_s <= 0.0 {
             period_s = 1.0;

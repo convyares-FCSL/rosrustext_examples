@@ -9,7 +9,7 @@
   <buildtool_depend>ament_cargo</buildtool_depend>
 
   <depend>rclrs</depend>
-  <depend>utils_rust</depend>
+  <depend>utils_rclrs</depend>
   <depend>lesson_interfaces</depend>
 
   <export>
