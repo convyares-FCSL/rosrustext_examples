@@ -1,6 +1,13 @@
-def from_params(node, service_name: str, default_value: str) -> str:
-    return node.declare_parameter(f"services.{service_name}", default_value).value
+"""
+Central definition of service names for the tutorial workspace.
+"""
 
+from rclpy.node import Node
 
-TODO = "todo"
-
+def compute_stats(node: Node) -> str:
+    """
+    Returns the service name for the statistics service.
+    Currently returns a hardcoded string, but wrapping it here allows
+    for future remapping or parameterization logic if needed.
+    """
+    return "compute_stats"
