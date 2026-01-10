@@ -7,9 +7,8 @@ This directory contains modular scripts to build the workspace in a deterministi
 ```text
 scripts/
 ├── 01_setup/
-├── 01_setup/
 │   └── build_interfaces.sh       # Step 1: Build shared messages
-│                                 # (Includes template patching & validation for pinned Rust deps)
+│                                 # (Includes local build of core interfaces & validation)
 ├── 02_bootstrap/
 │   ├── build_python.sh           # Step 2: Build utils & bootstrap for Python
 │   ├── build_cpp.sh              # Step 2: Build utils & bootstrap for C++

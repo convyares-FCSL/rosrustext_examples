@@ -24,25 +24,25 @@ struct SubscriberChatter {
 }
 
 impl SubscriberChatter {
-fn new(node: &Node, reset_max_value: u64) -> Result<Self, RclrsError> {
-    let logger = node.logger().clone();
+    fn new(node: &Node, reset_max_value: u64) -> Result<Self, RclrsError> {
+        let logger = node.logger().clone();
 
-    let topic_name = topics::chatter(node);
-    let qos_profile = qos::from_parameters(node);
+        let topic_name = topics::chatter(node);
+        let qos_profile = qos::from_parameters(node);
 
-    let state = Arc::new(Mutex::new(StreamState {
-        initialized: false,
-        expected: 0,
-        reset_max_value,
-    }));
+        let state = Arc::new(Mutex::new(StreamState {
+            initialized: false,
+            expected: 0,
+            reset_max_value,
+        }));
 
-    let mut options = rclrs::SubscriptionOptions::new(topic_name.as_str());
-    options.qos = qos_profile;
+        let mut options = rclrs::SubscriptionOptions::new(topic_name.as_str());
+        options.qos = qos_profile;
 
-    let sub = Self::create_subscription(node, options, logger.clone(), Arc::clone(&state))?;
+        let sub = Self::create_subscription(node, options, logger.clone(), Arc::clone(&state))?;
 
-    Ok(Self {_sub: sub, _logger: logger, _state: state})
-}
+        Ok(Self {_sub: sub, _logger: logger, _state: state})
+    }
 
     fn create_subscription(node: &Node, options: rclrs::SubscriptionOptions, logger: Logger, state: Arc<Mutex<StreamState>>) -> Result<rclrs::Subscription<MsgCount>, RclrsError> {
         node.create_subscription::<MsgCount, _>(options, move |msg: MsgCount| {

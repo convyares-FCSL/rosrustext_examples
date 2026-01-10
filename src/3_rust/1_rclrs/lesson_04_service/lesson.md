@@ -1,139 +1,126 @@
-# Lesson 03 (roslibrust) – Subscriber
+# Lesson 04 (Rust) – Services & Logic Separation
 
 ## Goal
 
-Create a node that:
+Create a service server and client that:
 
-* connects to `rosbridge` and subscribes to the shared `chatter` topic
-* manually defines the `MsgCount` struct (since we are in a Cargo-only crate)
-* uses shared configuration for topic name and QoS (`utils_roslibrust`)
-* validates message flow at runtime
-* tolerates late joiners and publisher restarts / manual injections
-* shuts down cleanly on Ctrl+C
+* Implements the `ComputeStats` service (sum, average, status).
+* Separates **Business Logic** (pure Rust library) from **Middleware** (ROS node).
+* Uses shared configuration for service names (`utils_rclrs`).
+* Uses the `rclrs` **Executor** pattern for async request handling.
 
-This lesson focuses on **system verification and transport robustness** via the bridge.
-
-> Assumes Lesson 02 is complete and `rosbridge_server` is running.
+This lesson focuses on **Rust idiomatic architecture** and the **Client–Server** pattern.
 
 ---
 
-## Prerequisites
+## Build (workspace overlay)
 
-**Terminal 1 (Bridge):**
+From the workspace root:
 
 ```bash
-source /opt/ros/jazzy/setup.bash
-ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+cd ~/ros2_ws_tutorial
+colcon build --packages-select utils_rclrs lesson_interfaces
+colcon build --packages-select lesson_04_service_rclrs
+source ~/ros2_ws_tutorial/install/setup.bash
+````
+
+Note: If colcon warns about overriding packages already in an underlay, you may need:
+
+```bash
+colcon build --packages-select utils_rclrs lesson_interfaces --allow-overriding utils_rclrs lesson_interfaces
 ```
 
 ---
 
-## Build
+## Verify: Unit Testing (Logic Only)
 
-This is a **Cargo-only Rust crate** inside the workspace.
+Because the math logic is in `src/lib.rs`, we can test it using `cargo test` without ROS 2.
 
 ```bash
-cd ~/ros2_ws_tutorial/src/3_rust/2_rcllibrust/lesson_03_subscriber/
-cargo build
+cd ~/ros2_ws_tutorial/src/3_rust/1_rclrs/lesson_04_service
+cargo test
+```
+
+Expected: 4 tests pass.
+
+---
+
+## Run: The Server
+
+Terminal 1:
+
+```bash
+source ~/ros2_ws_tutorial/install/setup.bash
+ros2 run lesson_04_service_rclrs service_server
+```
+
+Expected output:
+
+```text
+[INFO] [lesson_04_service_server]: Lesson 04 service server started. Ctrl+C to exit.
 ```
 
 ---
 
-## Run
+## Verify: Service Logic
+
+### Method 1 – Manual CLI Test
 
 Terminal 2:
 
 ```bash
-RUST_LOG=info cargo run
+source ~/ros2_ws_tutorial/install/setup.bash
+ros2 service call /compute_stats lesson_interfaces/srv/ComputeStats "{data: [10.0, 20.0, 30.0]}"
 ```
 
-**Expected output (idle):**
+Server logs:
 
 ```text
-[INFO] Connected to ws://localhost:9090
-[INFO] Lesson 03 node started (subscriber). Ctrl+C to exit.
+[INFO] [lesson_04_service_server]: Incoming request with 3 samples.
+[INFO] [lesson_04_service_server]: Computation complete: Sum=60.00, Avg=20.00
 ```
 
-The node remains quiet until it receives data. This is normal subscriber behaviour.
+CLI response:
 
----
+```text
+response:
+lesson_interfaces.srv.ComputeStats_Response(sum=60.0, average=20.0, status='Success')
+```
 
-## Verify: Data Flow
+> If your configured service name differs, check it with `ros2 service list -t`
+> and use that name in the `ros2 service call`.
 
-### Method 1 – Manual CLI Test
+### Method 2 – Rust Client Node
 
-Publish a single message to validate connectivity and QoS compatibility.
-
-Terminal 3:
+Terminal 2:
 
 ```bash
-ros2 topic pub /chatter lesson_interfaces/msg/MsgCount "{count: 1}" --once
+source ~/ros2_ws_tutorial/install/setup.bash
+ros2 run lesson_04_service_rclrs service_client
 ```
 
-Terminal 2 output (example):
+Expected output:
 
 ```text
-[INFO] Received (initial): 1
+[INFO] [lesson_04_service_client]: Lesson 04 service client started.
+[INFO] [lesson_04_service_client]: Waiting for service...
+[INFO] [lesson_04_service_client]: Sending request with 3 samples...
+[INFO] [lesson_04_service_client]: Result -> Sum: 61.40, Avg: 20.47, Status: 'Success'
 ```
-
----
-
-### Method 2 – Cross-Language Integration
-
-Keep the Rust subscriber running.
-
-In a third terminal, start a **publisher from another language** (Python or C++ Lesson 02).
-
-Example (C++):
-
-```bash
-ros2 run lesson_02_publisher_cpp node
-```
-
-Example (Python):
-
-```bash
-ros2 run lesson_02_publisher_py lesson_02_publisher
-```
-
-Terminal 2 output (example):
-
-```text
-[INFO] Received (initial): 1
-[INFO] Received: 2
-[INFO] Received: 3
-...
-```
-
-If you restart the publisher or inject a low counter value, the subscriber may log:
-
-```text
-[WARN] Detected counter reset. Re-syncing at: 1
-```
-
-This is expected and confirms reset tolerance.
 
 ---
 
 ## Runtime Inspection
 
-Inspect the active subscription and QoS settings:
-
 ```bash
-ros2 topic info -v /chatter
+ros2 service list -t
 ```
 
-Verify that:
+Verify `/compute_stats` is listed with type `lesson_interfaces/srv/ComputeStats`.
 
-* A node (likely unnamed or auto-named by the bridge) is listed as a subscriber.
-* QoS settings match those defined by `utils_roslibrust`.
 ---
 
 ## Notes
 
-* **Topic & QoS** are loaded via `utils_roslibrust` (not hardcoded).
-* **Manual Message Definition**: Because this is a Cargo-only crate, we define `MsgCount` manually with `serde` rather than linking generated C++ headers.
-* **Late joiners** initialise on the first observed message.
-* **Publisher restarts / manual injections** are detected and handled via resync.
-
-For architectural rationale and patterns, see `lesson_breakdown.md`.
+* **Executor pattern (rclrs 0.6.x):** the client uses `call_then(...)` to register a callback, and the callback is executed while `executor.spin(...)` is running.
+* **Separation of concerns:** `compute(&[f64]) -> StatsResult` stays pure and testable; ROS nodes only translate requests/responses and log.

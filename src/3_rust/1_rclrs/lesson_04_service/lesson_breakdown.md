@@ -1,193 +1,175 @@
-# Lesson 03 Breakdown: Subscribers, QoS, and System Verification (Rust / rclrs)
+# Lesson 04 Breakdown: Services, Async Clients, and Testability (Rust)
 
 ## Architectural Intent
 
-Lesson 03 is the point where “my node runs” stops being the goal.
+Lesson 04 introduces the **Request–Response** communication model using ROS 2 Services.
 
-The goal is:
+Unlike Topics (Lesson 03), services are **discrete interactions**: a client issues a request and receives a single response. This lesson focuses on implementing services in a way that is:
 
-> **Prove that the ROS graph behaves correctly** across languages and across real operator workflows (late joiners, restarts, manual injections).
+* **Testable**
+* **Non-blocking**
+* **Architecturally clean**
+* **Idiomatic Rust**
 
-A subscriber is the best verification tool because it sits on the boundary between “my code” and “the system”.
-
----
-
-## What’s New in Lesson 03
-
-Compared to Lesson 02, the mechanics aren’t new — the emphasis is.
-
-Lesson 03 introduces three production concerns:
-
-1. **QoS compatibility as configuration**
-2. **Subscriber correctness under real graph conditions**
-3. **Stream validation (ordering + reset tolerance)**
-
-Everything else is established baseline.
+The emphasis is not on “calling a service”, but on building **professional service components** that scale.
 
 ---
 
-## Component Boundary: Subscriber as a “Unit of Integration”
+## Core Principle: Logic Separation (Pure Rust Library)
 
-Lesson 02 introduced the idea that a publisher shouldn’t bloat the node struct.
+Service callbacks must remain **thin adapters**. All business logic is implemented in a pure Rust library (`lib.rs`) with no ROS dependencies.
 
-Lesson 03 applies the same rule:
+```text
+service_server.rs   (ROS adapter)
+ └── lib.rs         (Pure Rust logic)
+```
 
-* The **Node container** exists to own lifecycle and keep handles alive.
-* The **Subscriber component** is a self-contained unit: it owns the subscription handle and the stream-validation state and exposes one entrypoint (`on_msg`).
+### Why this matters
 
-That structure matters because subscribers are where complexity accumulates first:
-filters, transforms, health checks, latching behaviors, metrics, backpressure, etc.
+Separating logic from middleware provides:
 
-If the subscriber starts life embedded directly in the node, it’s painful to grow later.
-
----
-
-## Why the Subscriber Component Owns the Subscription Handle
-
-In `rclrs`, if you drop the subscription handle, the subscription stops existing.
-
-So the component holds:
-
-* `_sub`: keep-alive handle for the DDS subscription
-* `_state`: keep-alive handle for shared state
-* `_logger`: stable logger handle used by both node and callback
-
-The underscore naming is intentional: these fields are not “business data”, they are *lifetime anchors*.
+1. **Deterministic unit testing** without ROS.
+2. **Reusability** outside ROS (CLI tools, batch jobs, simulations).
+3. **Clear ownership boundaries** between computation and transport.
+4. **Predictable failure modes** (logic bugs vs. communication bugs).
 
 ---
 
-## Rust-Specific Constraint: Callbacks Need Interior Mutability
+## Business Logic Design
 
-The important Rust-specific reality:
+The core logic is implemented as a pure function:
 
-* The callback runs from inside the executor.
-* The closure you pass to `create_subscription` is typically called via `Fn`, not `FnMut`.
-* That means you cannot safely mutate normal struct fields through `&self` inside the callback.
+```rust
+pub fn compute(data: &[f64]) -> StatsResult
+```
 
-So Lesson 03 uses:
+### Key properties
 
-* `Arc<Mutex<StreamState>>`
+* Accepts a **slice** (`&[f64]`) — no allocation or ownership transfer.
+* Returns a simple struct (`StatsResult`) — no ROS types.
+* Encodes **semantic state** in `status` rather than throwing errors.
+* Handles edge cases (empty input) deterministically.
 
-This is not “because Rust is hard”.
-It is the correct tradeoff for production:
+### Unit Testing
 
-* simple
-* explicit
-* safe under concurrency
-* matches future executor evolution (multi-threaded / callback groups later)
+Because the logic is middleware-free, it is verified using standard Rust tests:
 
-You can swap `Mutex` for a lock-free approach later if you actually need it.
-Default to correctness.
+```bash
+cargo test
+```
 
----
-
-## Stream Validation: What We’re Actually Checking
-
-The incoming message stream is assumed to be a monotonically increasing counter (`MsgCount.count`).
-
-The subscriber validates that assumption at runtime to detect:
-
-### 1) Late joiners
-
-A subscriber may start after the publisher, so the first value is arbitrary.
-
-Policy:
-
-* first message initializes the baseline (`expected = first + 1`)
-* logs `Received (initial)`
-
-### 2) Publisher restarts / manual injection
-
-A restarted publisher commonly resets the counter to `0` or `1`.
-A human using CLI tools will also inject low values.
-
-Policy:
-
-* if `count` drops below expected and is “small enough” (≤ `reset_max_value`)
-* treat it as a reset and resync (`expected = count + 1`)
-* logs `Detected counter reset...`
-
-### 3) Out-of-order / stale samples
-
-If `count < expected` and does *not* look like a reset, it’s likely:
-
-* QoS mismatch causing drops/replays
-* multiple publishers on same topic
-* ordering issues under load
-* stale cache / unexpected topology
-
-Policy:
-
-* log warning
-* do not update expected (don’t let bad data shift your baseline)
-
-These rules are the same conceptual behavior you implemented in Python and C++ — Rust just forces you to be explicit about state access.
+This confirms algorithm correctness **before any ROS node is launched**.
 
 ---
 
-## Why the Checks Live as Named Helpers
+## The Server Pattern: Adapter, Not Logic
 
-The production pattern is:
+The service server acts as a **strict adapter**.
 
-* One authoritative entrypoint: `on_msg`
-* Small named helpers for each decision gate
+Its responsibilities are limited to:
 
-This makes the logic readable without tutorial comments:
+1. Receiving a `ComputeStats_Request`
+2. Delegating to `compute(&request.data)`
+3. Translating `StatsResult` → `ComputeStats_Response`
+4. Logging results
 
-* `extract_count`
-* `handle_initial`
-* `handle_reset`
-* `handle_out_of_order`
+The server **does not** perform calculations or enforce business rules.
 
-The code reads like a state machine, not a blob of branching.
+### Service Callback Form
 
-That matters because subscribers are frequently edited under pressure during commissioning.
+In `rclrs` v0.6.x, the service callback uses the single-argument form:
 
----
+```rust
+move |request: ComputeStats_Request| -> ComputeStats_Response { ... }
+```
 
-## QoS Matching: Why the Subscriber Loads QoS the Same Way as the Publisher
-
-In ROS 2, the most common silent failure is QoS mismatch.
-
-Lesson 03 makes QoS a configuration concern by reusing the same shared config path:
-
-* topic name: `topics::chatter(node)`
-* QoS profile: `qos::from_parameters(node)`
-
-This guarantees that:
-
-* if the system works in one language, it works in the others
-* compatibility is not “maintained by habit” but enforced by shared configuration
-
-If comms fail, the debugging focus is clear:
-
-* inspect `ros2 topic info -v /chatter`
-* compare QoS profiles
-* don’t hunt string literals in code
+This keeps the callback minimal and aligns with the executor-managed lifecycle.
 
 ---
 
-## What This Lesson Proves (When It Works)
+## The Client Pattern: Asynchronous and Executor-Safe
 
-When your Rust subscriber receives data from a C++ or Python publisher (or vice versa), you’ve validated:
+Although services are conceptually synchronous, their implementation **must be asynchronous** to avoid blocking the executor.
 
-* `MsgCount` is generated correctly across languages
-* DDS serialization/deserialization is interoperable
-* topic naming is consistent
-* QoS compatibility is real, not assumed
-* the system tolerates real operator behavior (late joiners, restarts, manual CLI testing)
+### Design Constraints
 
-That’s the baseline you need before you add services/actions/executors, because those features amplify any transport/config mistakes.
+* The executor must continue spinning to deliver responses.
+* Blocking calls inside callbacks or the main thread can stall the node.
+* The client must integrate cleanly with the event loop.
+
+### Implemented Pattern
+
+1. **Discovery**
+   The client waits for the service using `service_is_ready()`.
+
+2. **Dispatch**
+   The request is sent using `call_then(...)`, which registers a response callback.
+
+3. **Execution**
+   `executor.spin(...)` drives the callback when the response arrives.
+
+This guarantees:
+
+* No deadlocks
+* No busy waiting
+* No thread management in user code
+
+The executor remains the single coordination mechanism.
 
 ---
 
-## Reinforced Concepts
+## Type Safety and Explicitness
 
-Lesson 03 assumes and reinforces:
+Rust’s type system enforces clarity in asynchronous callbacks.
 
-* RAII keep-alive handles (subscriptions must be stored)
-* shared configuration (topic + QoS)
-* non-blocking callbacks (callback delegates to logic)
-* explicit state ownership (Rust’s concurrency rules are not optional)
+In the client, the response type is explicitly annotated:
 
-From here on, the Rust track is not “special”: it’s just another first-class node in the graph.
+```rust
+move |response: ComputeStats_Response| { ... }
+```
+
+This removes ambiguity in generic contexts and makes callback intent explicit — an important practice in production Rust code.
+
+---
+
+## Error Handling and Executor Control
+
+Executor shutdown and error handling use the `RclrsErrorFilter` trait:
+
+```rust
+.spin(...)
+.ignore_non_errors()
+.first_error()
+```
+
+This pattern ensures:
+
+* Clean shutdown on fatal errors
+* Signal handling remains centralized
+* Middleware noise does not terminate the process prematurely
+
+---
+
+## Configuration via Shared Utilities
+
+Service names are resolved via `utils_rclrs::services`, not hardcoded strings.
+
+Benefits:
+
+* Single source of truth
+* Consistent naming across server, client, and CLI
+* Safe refactoring without touching node logic
+
+---
+
+## Why This Lesson Matters
+
+Lesson 04 establishes a **repeatable service architecture** in Rust:
+
+* Business logic is verified through unit tests
+* ROS nodes are thin, predictable adapters
+* Clients are asynchronous and executor-safe
+* Configuration is centralized
+* The system scales without increasing complexity
+
+This pattern forms the foundation for all higher-level service-based systems, including orchestration layers, diagnostics services, and supervisory control.
