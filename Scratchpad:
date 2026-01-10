@@ -1,0 +1,69 @@
+### 1. Scratchpad: Lesson 05 Intent
+
+*Use this as our mental contract for the next few steps.*
+
+**Lesson 05: Parameters & Central Configuration**
+
+* **The Vehicle**: Revisit the publisher (`MsgCount` on `chatter`) using **fully parameterised config**.
+* **The Source of Truth**: Central YAML in `lesson_interfaces/config/`.
+* **The Outputs**:
+
+  * The node runs using config loaded from YAML (topic, QoS, rate, behaviour).
+  * Runtime inspection shows the node’s effective parameters.
+  * Updates are applied safely at runtime *where supported*.
+
+---
+
+#### The “New” Concept: Configuration as a System
+
+* **Not hardcoded**: topic names, QoS, publish rate, and behaviour are not embedded in node code.
+* **Validated**: bad config fails fast with clear errors (or clamps with explicit warnings).
+* **Inspectable**: the node can print its “effective config” (post-defaults/post-validation).
+* **Reloadable**:
+
+  * **rclpy / rclcpp / rclrs**: param callbacks apply updates (with safe boundaries).
+  * **roslibrust**: no ROS param server → reload YAML via **SIGHUP** or **file polling/watch**.
+
+---
+
+#### The Architecture
+
+* **Central YAML** (shared across languages):
+
+  * `topics_config.yaml` → names
+  * `qos_config.yaml` → profiles
+  * `services_config.yaml` → service names
+  * (Optionally) `lesson_05_config.yaml` → node-specific settings (rate, behaviour, which QoS profile to use)
+
+* **Language utils** (thin adapters):
+
+  * Load YAML + defaults
+  * Validate + normalise
+  * Provide typed getters:
+
+    * `topics::chatter(...)`
+    * `qos::from_parameters(...)` or `qos::from_profile(...)`
+    * `publisher_config::from_*()`
+
+* **Node code**:
+
+  * Declares parameters (native tracks)
+  * Applies config at startup
+  * Registers update callback / reload hook
+  * Rebuilds resources only when required (QoS/topic changes)
+
+---
+
+#### The Artifacts
+
+* Update `lesson_interfaces/config/*.yaml` to a **current, consistent schema**.
+* Update each language’s `utils_*` to read the same schema.
+* Update Lesson 02 publisher into Lesson 05 publisher:
+
+  * Fully param-driven.
+  * Demonstrates runtime updates + inspection.
+* Add a short “Inspection” section:
+
+  * `ros2 param list/get/set`
+  * `ros2 topic info -v`
+  * show effective config logging

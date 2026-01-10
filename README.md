@@ -1,20 +1,19 @@
 # ROS 2 Lessons Workspace
 
 This repository contains a structured, multi-language ROS 2 lesson series.
-It is designed to teach **core ROS 2 concepts consistently across languages**
-while remaining close to professional, production-style usage.
 
-The same lesson numbers exist for **Python**, **C++**, **rclrs**, and **rcllibrust**
-so that behaviour, naming, and configuration patterns can be compared directly.
+It is designed to teach **core ROS 2 concepts consistently across languages**, while staying close to **professional, production-style usage** rather than toy examples.
+
+The same lesson numbers exist for **Python**, **C++**, **rclrs**, and **roslibrust**, allowing behaviour, naming, configuration, and architectural trade-offs to be compared directly.
 
 ---
 
 ## Goals
 
-- **Parity**: Provide a consistent lesson sequence across Python, C++, and Rust.
-- **Simplicity vs. Reality**: Keep examples minimal but use production patterns (containers, lifecycle, configuration).
-- **Consistency**: Use the same topic, service, and action names to enable cross-language comparison.
-- **Explicit Trade-offs**: Make language trade-offs explicit (e.g., Latency vs. Dev Speed) via benchmarks.
+* **Parity**: A consistent lesson sequence across Python, C++, and Rust.
+* **Production Patterns**: Minimal examples that still use real-world structures (containers, composition, async execution).
+* **Consistency**: Shared topic, service, and action names across languages.
+* **Explicit Trade-offs**: Make language and transport trade-offs visible (e.g. DDS vs bridge, latency vs ergonomics).
 
 ---
 
@@ -28,7 +27,7 @@ src/
 │   ├─ lesson_02_publisher
 │   ├─ lesson_03_subscriber
 │   ├─ lesson_04_service
-│   └─ utils_py/             # Python-specific utilities
+│   └─ utils_py/
 │
 ├─ 2_cpp/                    # C++ lessons (rclcpp)
 │   ├─ lesson_00_bootstrap
@@ -36,154 +35,213 @@ src/
 │   ├─ lesson_02_publisher
 │   ├─ lesson_03_subscriber
 │   ├─ lesson_04_service
-│   └─ utils_cpp/            # C++-specific utilities
+│   └─ utils_cpp/
 │
 ├─ 3_rust/
-│   ├─ 1_rclrs/              # Native Rust Nodes (Primary Track)
+│   ├─ 1_rclrs/              # Native Rust nodes (DDS, primary track)
 │   │   ├─ lesson_00_bootstrap
 │   │   ├─ lesson_01_node
 │   │   ├─ lesson_02_publisher
 │   │   ├─ lesson_03_subscriber
 │   │   ├─ lesson_04_service
-│   │   └─ utils_rclrs/      # Rust (rclrs)-specific utilities
+│   │   └─ utils_rclrs/
 │   │
-│   └─ 2_rcllibrust/         # Rust Client/Bridge (Secondary Track)
+│   └─ 2_rcllibrust/         # Rust via rosbridge (async / external clients)
 │       ├─ lesson_00_bootstrap
 │       ├─ lesson_01_node
 │       ├─ lesson_02_publisher
 │       ├─ lesson_03_subscriber
 │       ├─ lesson_04_service
-│       └─ utils_rcllibrust/    # Rust (rcllibrust)-specific utilities
+│       └─ utils_rcllibrust/
 │
-├─ 4_interfaces/          
-│   ├─ lesson_interfaces/    # Shared interfaces
-│   │   ├─config/            # yaml config
-│   │   ├─msg/               # message interface
-│   │   ├─srv/               # service interface
-│   │   ├─action/            # action interface
-│   │   
-│   ├─ rosidl_rust/          # ROSIDL for Rust
+├─ 4_interfaces/
+│   ├─ lesson_interfaces/    # Shared ROS interfaces
+│   │   ├─ config/           # YAML configuration
+│   │   ├─ msg/              # Messages
+│   │   ├─ srv/              # Services
+│   │   └─ action/           # Actions
+│   └─ rosidl_rust/          # ROSIDL Rust bindings
 │
-├─ 5_benchmark/              # Engineering Studies (Latency/Jitter)
+├─ 5_benchmark/              # Latency / jitter studies
 │
-templates/                   # Starter boilerplate for new packages
-│
-scripts/                     # Script for benchmarking
+templates/                   # Starter boilerplate
+scripts/                     # Workspace automation
 ```
 
 ---
 
-## Architectural Progression
+## Lesson Structure
 
-Unlike tutorials that use simple scripts, this workspace teaches scalable patterns from day one:
+Each lesson is implemented across all languages using the same numbering and naming.
 
-1. **Lesson 00 (The Container)**:
-Wraps the Node in a Class/Struct to manage lifecycle (RAII). Ensures clean shutdown and prevents "zombie nodes."
+Every lesson is described using the same three lenses:
 
-2. **Lesson 01 (The Event Loop)**:
-Introduces shared state (Atomic counters in Rust, Class members in Python/C++) and timer scheduling.
+* **Goal** – what problem the lesson solves
+* **Focus** – the ROS 2 concepts being introduced
+* **Architecture** – the structural pattern being taught
 
-3. **Lesson 02 (Composition)**:
-Separates **Logic** (application behaviour) from **Lifecycle** (ROS resource ownership). Introduces dependency injection and **Custom Interfaces**.
-
-4. **Lesson 03 (System Verification)**:
-Validates language-agnostic communication, QoS compatibility, and stream robustness (late joiners, restarts, resets). Introduces logic injection for subscriber callbacks and transport-aware validation.
-
-5. **Lesson 04 (Services & Testability)**:  
-Introduces request–response semantics and strict separation between **Business Logic** and **Middleware**. Demonstrates how the same service (`ComputeStats`) can be implemented and tested consistently across languages, with logic verified independently of the ROS graph.
+This makes it possible to compare implementations directly while keeping the learning intent clear.
 
 ---
 
-## Lesson Roadmap
+## Lessons
 
-### Lesson 00 – Workspace bootstrap (Implemented)
+### Lesson 00 – Bootstrap
 
-* **Goal**: One minimal package per language.
-* **Focus**: Build tooling (`colcon` vs `cargo`) and environment verification.
+**Goal**
+Create the smallest possible ROS-capable package per language.
 
-### Lesson 01 – Simple node (Implemented)
+**Focus**
+Build systems (`colcon` vs `cargo`), environment setup, logging, clean shutdown.
 
-* **Goal**: Continuous execution with a 1Hz timer.
-* **Focus**: Parameter declaration, timer scheduling, and safe state mutation.
+**Architecture**
+Node wrapped in a class/struct to enforce ownership, RAII, and predictable shutdown. No “naked scripts”.
 
-### Lesson 02 – Publisher (Implemented)
+---
 
-* **Goal**: Publish a custom `MsgCount` message on a shared topic.
-* **Focus**:
-  * Defining `.msg` files in `lesson_interfaces`.
-  * Using shared utility libraries (`utils_py`, `utils_rclrs`, `utils_roslibrust`) for configuration.
-  * **Composition**: Moving logic out of the main node class.
+### Lesson 01 – Event Loop
 
-### Lesson 03 – Subscriber (Implemented)
+**Goal**
+Introduce continuous execution.
 
-* **Goal**: Verify cross-language message flow using a shared interface.
-* **Focus**:
-  * QoS compatibility as a configuration concern
-  * Late-joiner handling and publisher reset tolerance
-  * Logic injection for subscriber callbacks
+**Focus**
+Timers, parameters, safe state mutation.
 
-### Lesson 04 – Services & Unit Testing (Implemented)
+**Architecture**
+Explicit event loop with owned state (class members in Python/C++, struct fields in Rust).
 
-* **Goal**: Implement `lesson_interfaces/srv/ComputeStats` service server and client.
-* **Focus**:
-  * **Business Logic Isolation**: Math implemented in a pure language-native module (no ROS dependencies).
-  * **Unit Testing**: Verifying logic using standard tooling (`pytest`, `GTest`, `cargo test`) without running the ROS graph.
-  * **Service Pattern**: Asynchronous request/response handling using a shared interface.
+---
+
+### Lesson 02 – Publisher
+
+**Goal**
+Publish a shared custom message across languages.
+
+**Focus**
+Custom interfaces (`.msg`), configuration reuse, composition.
+
+**Architecture**
+Separation between:
+
+* **Logic** (what data changes)
+* **Lifecycle / Resources** (publisher ownership)
+
+Publishers become injected dependencies rather than global objects.
+
+---
+
+### Lesson 03 – Subscriber & System Verification
+
+**Goal**
+Verify cross-language message flow and transport correctness.
+
+**Focus**
+QoS compatibility, late joiners, publisher restarts, reset tolerance.
+
+**Architecture**
+Subscriber implemented as a **self-contained component**:
+
+* Logic injected into callbacks (native nodes)
+* Async stream processing inside a background task (roslibrust)
+
+This lesson treats the subscriber as a **verification tool**, not just a data consumer.
+
+---
+
+### Lesson 04 – Services & Unit Testing
+
+**Goal**
+Implement a request–response service with verifiable logic.
+
+**Focus**
+Services, async request handling, testability.
+
+**Architecture**
+Strict separation between:
+
+* **Business Logic**: Pure, deterministic, no ROS dependencies
+* **Middleware Adapter**: Service server/client that converts ROS types
+
+---
 
 ### Lesson 05 – Parameters (Planned)
 
-* **Goal**: Declare and validate parameters via `config/topics_config.yaml`.
-* **Focus**: Runtime updates via callbacks and "Source of Truth" configuration management.
-  * Yaml config
+**Goal**
+Centralised, validated configuration.
 
-### Lesson 06 – Lifecycle publisher (Planned)
+**Focus**
+Runtime updates, parameter callbacks, YAML as source of truth.
 
-* **Goal**: Lifecycle-enabled node (Managed Node).
-* **Focus**: Publisher created on `configure`, active only after `activate`.
-  * Lifecycle manager
-  * rosrustext introduction
-
-### Lesson 07 – Actions (Planned)
-
-* **Goal**: `CountUntil` action server and client.
-* **Focus**: Feedback loops, result handling, and cancellation logic.
-  * Action server
-  * Action client
-
-### Lesson 08 – Executors and callback groups (Planned)
-
-* **Goal**: Multi-threaded execution.
-* **Focus**: Callback group isolation and non-blocking patterns.
-
-### Lesson 09 – Launch files and configuration discovery (Planned)
-
-* **Goal**: Unified launch system.
-* **Focus**: Developer-mode configuration (source tree) vs. Installed configuration (package share), demonstrating why hardcoding paths fails in production.
-  * Launch files
-  * Configuration discovery
+**Architecture**
+Configuration externalised from node code and shared across languages.
 
 ---
 
-## Templates
+### Lesson 06 – Lifecycle Publisher (Planned)
 
-Starter templates live in the `templates/` directory. They provide the minimal boilerplate required to start a new lesson with the correct build configuration.
+**Goal**
+Introduce managed nodes.
 
-* `templates/python`: `setup.py`, `package.xml`, and node skeleton.
-* `templates/cpp`: `CMakeLists.txt` and `package.xml` with standard dependencies.
-* `templates/rclrs`: `Cargo.toml` configured for `rosidl` generation dependencies.
+**Focus**
+Lifecycle transitions, controlled activation.
 
-To use one, copy it into `src/` and rename the folders.
+**Architecture**
+Resources created on `configure`, activated explicitly, destroyed cleanly.
+
+---
+
+### Lesson 07 – Actions (Planned)
+
+**Goal**
+Long-running tasks with feedback and cancellation.
+
+**Focus**
+Action servers and clients.
+
+**Architecture**
+Explicit state machines with feedback loops.
+
+---
+
+### Lesson 08 – Executors & Callback Groups (Planned)
+
+**Goal**
+Multi-threaded execution.
+
+**Focus**
+Callback group isolation, non-blocking patterns.
+
+**Architecture**
+Controlled concurrency instead of implicit threading.
+
+---
+
+### Lesson 09 – Launch & Configuration Discovery (Planned)
+
+**Goal**
+Production-grade startup.
+
+**Focus**
+Launch files, installed vs source-tree configuration.
+
+**Architecture**
+No hardcoded paths; runtime discovery only.
 
 ---
 
 ## Configuration Pattern
 
-We do **not** hardcode strings (e.g., `"chatter"`) inside Node code.
+Strings such as topic and service names are **not hardcoded** in node code.
 
-* **Definitions**: `src/4_interfaces/config/` (YAML files).
-* **Access**: Language-specific helpers (`utils_py`, `utils_cpp`, `utils_rclrs`, `utils_roslibrust`).
+* **Definitions**: `src/4_interfaces/config/` (YAML)
+* **Access**:
 
-This pattern allows topic names and QoS profiles to be changed system-wide by editing a single line of config, rather than hunting through source code.
+  * Python: `utils_py`
+  * C++: `utils_cpp`
+  * Rust (native): `utils_rclrs`
+  * Rust (bridge): `utils_rcllibrust`
+
+This allows system-wide changes by editing configuration rather than source.
 
 ---
 
@@ -191,23 +249,24 @@ This pattern allows topic names and QoS profiles to be changed system-wide by ed
 
 ### Python (`rclpy`)
 
-Optimized for orchestration and rapid iteration.
+Optimised for orchestration and rapid iteration.
 
 * **See**: `src/1_python/README.md` for build tips (`--symlink-install`).
 
 ### C++ (`rclcpp`)
 
-The reference implementation offering the lowest latency and most manual control.
+Reference implementation with lowest latency and maximum control.
 
 * **See**: `src/2_cpp/README.md` for header/source split details.
 
-### Rust (`rclrs` & `roslibrust`)
+### Rust
 
-Split into two tracks to demonstrate different architectural roles:
+Two complementary tracks:
 
-rclrs: Native DDS nodes using colcon. (The primary track).
+* **rclrs**: Native DDS nodes built with `colcon`
+* **roslibrust**: Async external clients using `rosbridge`
 
-roslibrust: Async/Tokio clients using rosbridge. (The external integration track).
+Together they demonstrate both embedded and integration-focused roles.
 
 * **See**: `src/3_rust/README.md` for critical build dependency instructions (`../../install/...`).
 
@@ -215,12 +274,13 @@ roslibrust: Async/Tokio clients using rosbridge. (The external integration track
 
 ## Benchmarks
 
-The `src/5_benchmark` directory contains optional studies on latency and jitter. These are **not** lessons but engineering references to help you choose the right language for a specific subsystem.
+`src/5_benchmark` contains optional latency and jitter studies.
+These are **engineering references**, not lessons.
 
 ---
 
 ## Workspace Automation
 
-For advanced users or CI/CD purposes, this workspace includes helper scripts to build the entire project in a deterministic order.
+Helper scripts are provided for deterministic builds and CI use.
 
-*   **See**: [scripts/README.md](scripts/README.md) for details on bulk building and cleaning the workspace.
+See: `scripts/README.md`
