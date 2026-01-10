@@ -14,6 +14,7 @@ When developing Python packages, always use the `--symlink-install` flag. This c
 ```bash
 cd ~/ros2_ws_tutorial
 colcon build --symlink-install --packages-select lesson_00_bootstrap_py
+
 ```
 
 ### 2. Automatic Sourcing
@@ -30,6 +31,17 @@ source /opt/ros/jazzy/setup.bash
 if [ -f ~/ros2_ws_tutorial/install/setup.bash ]; then
   source ~/ros2_ws_tutorial/install/setup.bash
 fi
+
+```
+
+### 3. Running Tests
+
+Lesson 04 introduces unit testing. To run tests via the build system:
+
+```bash
+colcon test --packages-select lesson_04_service_py --pytest-args -v
+colcon test-result --all --verbose
+
 ```
 
 ---
@@ -47,6 +59,7 @@ class MyNode(Node):
     def __init__(self):
         super().__init__("my_node_name")
         # Logic goes here
+
 ```
 
 ### The `main` Entry Point
@@ -65,19 +78,31 @@ def main(args=None):
     finally:
         if node: node.destroy_node()
         if rclpy.ok(): rclpy.shutdown()
+
 ```
+
+### Logic Separation (Lesson 04+)
+
+To enable Unit Testing without a full ROS environment, we separate **Business Logic** (Pure Python) from **Application Logic** (ROS).
+
+* **Logic Class**: No `rclpy` imports. Pure inputs/outputs. Testable with `pytest`.
+* **Node Class**: Wraps the logic, handles Topics/Services, and manages concurrency.
 
 ---
 
 ## Lessons
-1. **Lesson 00**: Bootstrap & Lifecycle  
-   The `main` pattern and clean shutdown semantics.
 
-2. **Lesson 01**: Parameters & Timers  
-   Event-loop execution and safe state mutation.
+1. **Lesson 00**: Bootstrap & Lifecycle
+The `main` pattern and clean shutdown semantics.
 
-3. **Lesson 02**: Publishers & Custom Interfaces  
-   Composition, shared configuration (`utils_py`), and message definitions.
+2. **Lesson 01**: Parameters & Timers
+Event-loop execution and safe state mutation.
 
-4. **Lesson 03**: Subscribers & System Verification  
-   QoS compatibility, cross-language validation, logic injection for callbacks, and stream reset tolerance.
+3. **Lesson 02**: Publishers & Custom Interfaces
+Composition, shared configuration (`utils_py`), and message definitions.
+
+4. **Lesson 03**: Subscribers & System Verification
+QoS compatibility, cross-language validation, logic injection for callbacks, and stream reset tolerance.
+
+5. **Lesson 04**: Services & Unit Testing
+Client/Server implementation, asynchronous request handling, and decoupling business logic for verification with `pytest`.

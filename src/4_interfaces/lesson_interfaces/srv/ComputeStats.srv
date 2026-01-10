@@ -1,0 +1,7 @@
+# Request
+float64[] data
+---
+# Response
+float64 sum
+float64 average
+string status

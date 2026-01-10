@@ -6,6 +6,8 @@ This directory contains shared ROS 2 interfaces and the tools required to genera
 
 - **`lesson_interfaces`**: Common messages, services, and actions for the tutorial.
 - **`rosidl_rust`**: Contains `rosidl_generator_rs`, the tool required to generate Rust definitions from `.msg` files.
+    - Note: This generator config is modified to use relative path dependencies.
+- **`rcl_interfaces`** & **`unique_identifier_msgs`**: Local clones of core ROS 2 interface packages. These are built locally with `rosidl_generator_rs` enabled to provide necessary Rust dependencies (`builtin_interfaces`, `service_msgs`, etc.) that are missing from the system installation.
 
 ## Usage in Rust
 

@@ -26,14 +26,16 @@ src/
 │   ├─ lesson_00_bootstrap
 │   ├─ lesson_01_node
 │   ├─ lesson_02_publisher
-│   └─ lesson_03_subscriber
+│   ├─ lesson_03_subscriber
+│   ├─ lesson_04_service
 │   └─ utils_py/             # Python-specific utilities
 │
 ├─ 2_cpp/                    # C++ lessons (rclcpp)
 │   ├─ lesson_00_bootstrap
 │   ├─ lesson_01_node
 │   ├─ lesson_02_publisher
-│   └─ lesson_03_subscriber
+│   ├─ lesson_03_subscriber
+│   ├─ lesson_04_service
 │   └─ utils_cpp/            # C++-specific utilities
 │
 ├─ 3_rust/
@@ -41,14 +43,16 @@ src/
 │   │   ├─ lesson_00_bootstrap
 │   │   ├─ lesson_01_node
 │   │   ├─ lesson_02_publisher
-│   │   └─ lesson_03_subscriber
+│   │   ├─ lesson_03_subscriber
+│   │   ├─ lesson_04_service
 │   │   └─ utils_rclrs/      # Rust (rclrs)-specific utilities
 │   │
 │   └─ 2_rcllibrust/         # Rust Client/Bridge (Secondary Track)
 │       ├─ lesson_00_bootstrap
 │       ├─ lesson_01_node
 │       ├─ lesson_02_publisher
-│       └─ lesson_03_subscriber
+│       ├─ lesson_03_subscriber
+│       ├─ lesson_04_service
 │       └─ utils_rcllibrust/    # Rust (rcllibrust)-specific utilities
 │
 ├─ 4_interfaces/          
@@ -85,6 +89,9 @@ Separates **Logic** (application behaviour) from **Lifecycle** (ROS resource own
 4. **Lesson 03 (System Verification)**:
 Validates language-agnostic communication, QoS compatibility, and stream robustness (late joiners, restarts, resets). Introduces logic injection for subscriber callbacks and transport-aware validation.
 
+5. **Lesson 04 (Services & Testability)**:  
+Introduces request–response semantics and strict separation between **Business Logic** and **Middleware**. Demonstrates how the same service (`ComputeStats`) can be implemented and tested consistently across languages, with logic verified independently of the ROS graph.
+
 ---
 
 ## Lesson Roadmap
@@ -103,9 +110,9 @@ Validates language-agnostic communication, QoS compatibility, and stream robustn
 
 * **Goal**: Publish a custom `MsgCount` message on a shared topic.
 * **Focus**:
-* Defining `.msg` files in `lesson_interfaces`.
-* Using shared utility libraries (`utils_py`, `utils_rclrs`, `utils_roslibrust`) for configuration.
-* **Composition**: Moving logic out of the main node class.
+  * Defining `.msg` files in `lesson_interfaces`.
+  * Using shared utility libraries (`utils_py`, `utils_rclrs`, `utils_roslibrust`) for configuration.
+  * **Composition**: Moving logic out of the main node class.
 
 ### Lesson 03 – Subscriber (Implemented)
 
@@ -115,25 +122,33 @@ Validates language-agnostic communication, QoS compatibility, and stream robustn
   * Late-joiner handling and publisher reset tolerance
   * Logic injection for subscriber callbacks
 
-### Lesson 04 – Services (Planned)
+### Lesson 04 – Services & Unit Testing (Implemented)
 
-* **Goal**: `example_interfaces/srv/AddTwoInts` server and client.
-* **Focus**: Input validation, error handling, and asynchronous service calls.
+* **Goal**: Implement `lesson_interfaces/srv/ComputeStats` service server and client.
+* **Focus**:
+  * **Business Logic Isolation**: Math implemented in a pure language-native module (no ROS dependencies).
+  * **Unit Testing**: Verifying logic using standard tooling (`pytest`, `GTest`, `cargo test`) without running the ROS graph.
+  * **Service Pattern**: Asynchronous request/response handling using a shared interface.
 
 ### Lesson 05 – Parameters (Planned)
 
 * **Goal**: Declare and validate parameters via `config/topics_config.yaml`.
 * **Focus**: Runtime updates via callbacks and "Source of Truth" configuration management.
+  * Yaml config
 
 ### Lesson 06 – Lifecycle publisher (Planned)
 
 * **Goal**: Lifecycle-enabled node (Managed Node).
 * **Focus**: Publisher created on `configure`, active only after `activate`.
+  * Lifecycle manager
+  * rosrustext introduction
 
 ### Lesson 07 – Actions (Planned)
 
 * **Goal**: `CountUntil` action server and client.
 * **Focus**: Feedback loops, result handling, and cancellation logic.
+  * Action server
+  * Action client
 
 ### Lesson 08 – Executors and callback groups (Planned)
 
@@ -144,6 +159,8 @@ Validates language-agnostic communication, QoS compatibility, and stream robustn
 
 * **Goal**: Unified launch system.
 * **Focus**: Developer-mode configuration (source tree) vs. Installed configuration (package share), demonstrating why hardcoding paths fails in production.
+  * Launch files
+  * Configuration discovery
 
 ---
 

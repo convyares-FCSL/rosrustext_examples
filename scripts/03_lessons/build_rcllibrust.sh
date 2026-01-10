@@ -22,4 +22,9 @@ cd src/3_rust/2_rcllibrust/lesson_03_subscriber
 cargo build
 cd - > /dev/null
 
+echo "    Building lesson_04_service..."
+cd src/3_rust/2_rcllibrust/lesson_04_service
+cargo build
+cd - > /dev/null
+
 echo "rcllibrust Lessons built."
