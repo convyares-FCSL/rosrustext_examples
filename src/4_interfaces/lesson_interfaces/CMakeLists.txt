@@ -3,6 +3,7 @@ project(lesson_interfaces)
 
 find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+find_package(rosidl_generator_rs REQUIRED)
 
 # 1. Define Messages
 set(msg_files

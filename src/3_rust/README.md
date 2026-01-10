@@ -35,6 +35,22 @@ Rust build tools do not automatically find ROS 2 message definitions in the sour
 lesson_interfaces = { path = "../../../../install/lesson_interfaces/share/lesson_interfaces/rust" }
 ```
 
+<details>
+<summary><strong>Deep Dive: The "Missing Crate" Issue & Partial Vendoring Fix</strong></summary>
+
+### The Problem
+`rosidl_generator_rs` (the tool that makes Rust code from `.msg` files) adds `builtin_interfaces` and `service_msgs` as dependencies in the generated `Cargo.toml`.
+However, because these packages are part of the ROS 2 core (installed in `/opt/ros`), they **do not have corresponding Rust crates** available on crates.io or in the system source. This causes `cargo build` to fail because it cannot resolve them.
+
+### The Fix
+We use a **Partial Vendoring Strategy**:
+1.  We created minimal "dummy" Rust crates for `builtin_interfaces` and `service_msgs` in `src/4_interfaces/vendor_dummy`.
+2.  We patched the build script (`scripts/01_setup/build_interfaces.sh`) to inject **relative path dependencies** into the generated `Cargo.toml`.
+
+**Result**:
+When `lesson_interfaces` builds, it links against these local dummy crates instead of trying to find broken versions on the internet. This ensures the build is self-contained and reliable.
+</details>
+
 ---
 
 ## 2. `2_rcllibrust` (Client/Bridge Library)

@@ -6,6 +6,8 @@ This directory contains shared ROS 2 interfaces and the tools required to genera
 
 - **`lesson_interfaces`**: Common messages, services, and actions for the tutorial.
 - **`rosidl_rust`**: Contains `rosidl_generator_rs`, the tool required to generate Rust definitions from `.msg` files.
+    - Note: This generator config is **patched** by `scripts/01_setup/build_interfaces.sh` to pin dependencies `builtin_interfaces` and `service_msgs` to local dummy packages to avoid yanked/missing crates on crates.io.
+- **`src/4_interfaces/vendor_dummy`**: Contains minimal dummy crates (`builtin_interfaces`, `service_msgs`) used to satisfy local build dependencies for `lesson_interfaces`.
 
 ## Usage in Rust
 
