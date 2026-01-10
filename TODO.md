@@ -59,7 +59,7 @@ This file tracks the structural, pedagogical, and technical status of the ROS 2 
 | **01** | **Node / Timer** | [X] | [X] | [X] | [X] | [X] |
 | **02** | **Publisher** | [X] | [X] | [X] | [X] | [X] |
 | **03** | **Subscriber** | [X] | [X] | [X] | [X] | [X] |
-| **04** | **Services** | [X] | [ ] | [ ] | [ ] | [ ] |
+| **04** | **Services** | [X] | [X] | [ ] | [ ] | [ ] |
 | **05** | **Parameters** | [ ] | [ ] | [ ] | [ ] | [ ] |
 | **06** | **Lifecycle** | [ ] | [ ] | [ ] | [ ] | [ ] |
 | **07** | **Actions** | [ ] | [ ] | [ ] | [ ] | [ ] |

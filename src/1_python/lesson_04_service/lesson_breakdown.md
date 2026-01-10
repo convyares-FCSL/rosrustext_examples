@@ -136,4 +136,4 @@ By isolating the "business logic" (the statistics math), we created a system whe
 2. The communication is verified via Integration Tests (CLI interaction).
 3. The configuration is centralized.
 
-This separation of concerns is the hallmark of professional robotics software engineering.
+This separation of concerns is the hallmark of professional distributed systems engineering.

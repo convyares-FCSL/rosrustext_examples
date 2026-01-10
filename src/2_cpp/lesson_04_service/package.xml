@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>lesson_04_service_cpp</name>
+  <version>0.1.0</version>
+  <description>Lesson 04 (C++): simple service server and client nodes.</description>
+  <maintainer email="you@example.com">Your Name</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>utils_cpp</depend>
+  <depend>lesson_interfaces</depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+  <test_depend>ament_cmake_gtest</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

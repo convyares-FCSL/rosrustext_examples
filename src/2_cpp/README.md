@@ -13,7 +13,6 @@ Unlike Python, C++ code must be compiled. Changes to `.cpp` or `.hpp` files requ
 ```bash
 cd ~/ros2_ws_tutorial
 colcon build --packages-select lesson_00_bootstrap_cpp
-
 ```
 
 ### 2. Why use `--symlink-install` with C++?
@@ -22,7 +21,6 @@ Even though C++ binaries are compiled, we still recommend using `--symlink-insta
 
 ```bash
 colcon build --symlink-install --packages-select lesson_00_bootstrap_cpp
-
 ```
 
 * **Binaries**: Must still be rebuilt to update.
@@ -37,7 +35,15 @@ source /opt/ros/jazzy/setup.bash
 if [ -f ~/ros2_ws_tutorial/install/setup.bash ]; then
   source ~/ros2_ws_tutorial/install/setup.bash
 fi
+```
 
+### 4. Running Tests (Lesson 04+)
+
+Lesson 04 introduces Unit Testing (Google Test).
+
+```bash
+colcon test --packages-select lesson_04_service_cpp --ctest-args -V
+colcon test-result --all --verbose
 ```
 
 ---
@@ -79,22 +85,23 @@ int main(int argc, char ** argv) {
   rclcpp::shutdown();
   return EXIT_SUCCESS;
 }
-
 ```
 
 ---
 
 ## Lessons
 
-1. **Lesson 00**: Bootstrap  
-   Header/source separation and clean startup/shutdown.
+1. **Lesson 00**: Bootstrap
+Header/source separation and clean startup/shutdown.
 
-2. **Lesson 01**: Event Loop  
-   Timers, parameters, and event-driven execution using lambda callbacks.
+2. **Lesson 01**: Event Loop
+Timers, parameters, and event-driven execution using lambda callbacks.
 
-3. **Lesson 02**: Publishers  
-   Typed interfaces, shared configuration (`utils_cpp`), and system data sources.
+3. **Lesson 02**: Publishers
+Typed interfaces, shared configuration (`utils_cpp`), and system data sources.
 
-4. **Lesson 03**: Subscribers & System Verification  
-   QoS compatibility, cross-language validation, logic injection for callbacks,
-   and tolerance to late joiners and publisher restarts.
+4. **Lesson 03**: Subscribers & System Verification
+QoS compatibility, cross-language validation, logic injection for callbacks, and tolerance to late joiners and publisher restarts.
+
+5. **Lesson 04**: Services & Unit Testing
+Header-only logic libraries, asynchronous clients, and verification with GTest.
