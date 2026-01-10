@@ -26,14 +26,16 @@ src/
 │   ├─ lesson_00_bootstrap
 │   ├─ lesson_01_node
 │   ├─ lesson_02_publisher
-│   └─ lesson_03_subscriber
+│   ├─ lesson_03_subscriber
+│   ├─ lesson_04_service
 │   └─ utils_py/             # Python-specific utilities
 │
 ├─ 2_cpp/                    # C++ lessons (rclcpp)
 │   ├─ lesson_00_bootstrap
 │   ├─ lesson_01_node
 │   ├─ lesson_02_publisher
-│   └─ lesson_03_subscriber
+│   ├─ lesson_03_subscriber
+│   ├─ lesson_04_service
 │   └─ utils_cpp/            # C++-specific utilities
 │
 ├─ 3_rust/
@@ -41,14 +43,16 @@ src/
 │   │   ├─ lesson_00_bootstrap
 │   │   ├─ lesson_01_node
 │   │   ├─ lesson_02_publisher
-│   │   └─ lesson_03_subscriber
+│   │   ├─ lesson_03_subscriber
+│   │   ├─ lesson_04_service
 │   │   └─ utils_rclrs/      # Rust (rclrs)-specific utilities
 │   │
 │   └─ 2_rcllibrust/         # Rust Client/Bridge (Secondary Track)
 │       ├─ lesson_00_bootstrap
 │       ├─ lesson_01_node
 │       ├─ lesson_02_publisher
-│       └─ lesson_03_subscriber
+│       ├─ lesson_03_subscriber
+│       ├─ lesson_04_service
 │       └─ utils_rcllibrust/    # Rust (rcllibrust)-specific utilities
 │
 ├─ 4_interfaces/          
@@ -85,6 +89,9 @@ Separates **Logic** (application behaviour) from **Lifecycle** (ROS resource own
 4. **Lesson 03 (System Verification)**:
 Validates language-agnostic communication, QoS compatibility, and stream robustness (late joiners, restarts, resets). Introduces logic injection for subscriber callbacks and transport-aware validation.
 
+5. **Lesson 04 (Services & Testability)**:  
+Introduces request–response semantics and strict separation between **Business Logic** and **Middleware**. Demonstrates how the same service (`ComputeStats`) can be implemented and tested consistently across languages, with logic verified independently of the ROS graph.
+
 ---
 
 ## Lesson Roadmap
@@ -115,13 +122,13 @@ Validates language-agnostic communication, QoS compatibility, and stream robustn
   * Late-joiner handling and publisher reset tolerance
   * Logic injection for subscriber callbacks
 
-### Lesson 04 – Services & Unit Testing (Planned)
+### Lesson 04 – Services & Unit Testing (Implemented)
 
-* **Goal**: `lesson_interfaces/srv/ComputeStats` server and client.
+* **Goal**: Implement `lesson_interfaces/srv/ComputeStats` service server and client.
 * **Focus**:
-  * **Business Logic Isolation**: Separating math from middleware.
-  * **Unit Testing**: Verifying logic using standard tools (`pytest`, `GTest`, `cargo test`) without running the ROS graph.
-  * **Service Pattern**: Asynchronous request/response handling with custom types (`float64[]`).
+  * **Business Logic Isolation**: Math implemented in a pure language-native module (no ROS dependencies).
+  * **Unit Testing**: Verifying logic using standard tooling (`pytest`, `GTest`, `cargo test`) without running the ROS graph.
+  * **Service Pattern**: Asynchronous request/response handling using a shared interface.
 
 ### Lesson 05 – Parameters (Planned)
 

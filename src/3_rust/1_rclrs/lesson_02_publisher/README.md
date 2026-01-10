@@ -1,9 +1,9 @@
-# Lesson 02 (Rust) – Publisher
+# Lesson 02 (Rust / rclrs) – Publisher
 
 ## Goal
 Create a node that:
 - publishes a custom message (increasing integer) on the `chatter` topic
-- uses shared configuration for topic name and QoS (using `utils_rust`)
+- uses shared configuration for topic name and QoS (using `utils_rclrs`)
 - supports a parameter to control the publish rate
 - shuts down cleanly on Ctrl+C
 
@@ -72,7 +72,7 @@ ros2 run lesson_02_publisher_rclrs lesson_02_node --ros-args -p timer_period_s:=
 
 ## Notes
 
-* **Topic & QoS**: Handled by `utils_rust` helpers.
+* **Topic & QoS**: Handled by `utils_rclrs` helpers.
 * **Message Type**: `MsgCount` (int) defined in `src/4_interfaces/msg/MsgCount.msg`.
 * **Behavior**: Defaults to 1.0s period if `timer_period_s` is not set.
 

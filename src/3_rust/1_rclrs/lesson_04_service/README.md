@@ -1,4 +1,4 @@
-# Lesson 04 (Rust) – Services & Logic Separation
+# Lesson 04 (Rust / rclrs) – Services & Logic Separation
 
 ## Goal
 

@@ -1,95 +1,87 @@
-use std::time::Duration;
-use rclrs::{
-    log_info, log_error, Context, CreateBasicExecutor, Executor, Node, 
-    RclrsError, RclrsErrorFilter, SpinOptions
-};
-use lesson_interfaces::srv::{ComputeStats, ComputeStats_Request};
-use utils_rclrs::services;
+#include <chrono>
+#include <cstdlib>
+#include <memory>
+#include <vector>
 
-const NODE_NAME: &str = "lesson_04_service_client";
+#include "lesson_04_service/client_node.hpp"
+#include "utils_cpp/services.hpp"
 
-struct ClientComponent {
-    client: rclrs::Client<ComputeStats>,
-    logger: rclrs::Logger,
+using lesson_interfaces::srv::ComputeStats;
+using namespace std::chrono_literals;
+
+Lesson04ClientNode::Lesson04ClientNode(const rclcpp::NodeOptions &options)
+    : rclcpp::Node("lesson_04_service_client", options) {
+  
+  // 1. Configuration
+  auto service_name = services::compute_stats(*this);
+
+  // 2. Create Client
+  client_ = this->create_client<ComputeStats>(service_name);
+
+  // 3. Discovery (Blocking wait in constructor for tutorial simplicity)
+  //    In production, this might happen in a timer to avoid blocking startup.
+  while (!client_->wait_for_service(1s)) {
+    if (!rclcpp::ok()) {
+      RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for the service. Exiting.");
+      return;
+    }
+    RCLCPP_INFO(this->get_logger(), "Service '%s' not available, waiting...", service_name.c_str());
+  }
+
+  RCLCPP_INFO(this->get_logger(), "Service '%s' available.", service_name.c_str());
 }
 
-impl ClientComponent {
-    fn new(node: &Node) -> Result<Self, RclrsError> {
-        let logger = node.logger().clone();
-        let service_name = services::compute_stats(node);
-        let client = node.create_client::<ComputeStats>(&service_name)?;
+void Lesson04ClientNode::send_sample_request() {
+  auto request = std::make_shared<ComputeStats::Request>();
+  
+  // Sample data (matching Python lesson)
+  request->data = {10.5, 20.2, 30.7};
 
-        Ok(Self { client, logger })
-    }
+  RCLCPP_INFO(this->get_logger(), "Sending request with %zu samples...", request->data.size());
 
-    fn send_sample_request(&self, context: Context) {
-        let logger = self.logger.clone();
-        let request = ComputeStats_Request {
-            data: vec![10.5, 20.2, 30.7],
-        };
+  // 4. Async Call
+  //    We define the callback *before* sending to keep ownership clear.
+  auto future_callback = [this](rclcpp::Client<ComputeStats>::SharedFuture future) {
+    this->handle_response(future);
+  };
 
-        log_info!(logger, "Sending request with {} samples...", request.data.len());
-
-        // async_send_request returns a Receiver
-        let rx = self.client.async_send_request(&request);
-
-        // Spawn a thread to "wait" for the response without blocking the executor
-        // This is the Rust equivalent of the C++ async callback
-        std::thread::spawn(move || {
-            match rx.recv() {
-                Ok(response) => {
-                    log_info!(
-                        logger,
-                        "Result -> Sum: {:.2}, Avg: {:.2}, Status: '{}'",
-                        response.sum,
-                        response.average,
-                        response.status
-                    );
-                }
-                Err(e) => log_error!(logger, "Service call failed: {:?}", e),
-            }
-            // Shut down after receiving the result (matches C++ logic)
-            context.shutdown();
-        });
-    }
+  client_->async_send_request(request, future_callback);
 }
 
-struct Lesson04Node {
-    pub node: Node,
-    pub client_component: ClientComponent,
+void Lesson04ClientNode::handle_response(rclcpp::Client<ComputeStats>::SharedFuture future) {
+  try {
+    auto response = future.get();
+    RCLCPP_INFO(this->get_logger(), 
+      "Result -> Sum: %.2f, Avg: %.2f, Status: '%s'",
+      response->sum, response->average, response->status.c_str());
+      
+  } catch (const std::exception &e) {
+    RCLCPP_ERROR(this->get_logger(), "Service call failed: %s", e.what());
+  }
+
+  // Tutorial logic: Shutdown after one successful call
+  rclcpp::shutdown();
 }
 
-impl Lesson04Node {
-    fn new(executor: &Executor) -> Result<Self, RclrsError> {
-        let node = executor.create_node(NODE_NAME)?;
-        let client_component = ClientComponent::new(&node)?;
-        Ok(Self { node, client_component })
+int main(int argc, char **argv) {
+  rclcpp::init(argc, argv);
+
+  try {
+    auto node = std::make_shared<Lesson04ClientNode>();
+    
+    // Trigger the action
+    node->send_sample_request();
+
+    // Spin to allow the async callback to fire
+    rclcpp::spin(node);
+
+  } catch (const std::exception &e) {
+    // Check if exception is just normal shutdown
+    if (rclcpp::ok()) {
+        RCLCPP_ERROR(rclcpp::get_logger("lesson_04_service_client"), "Exception: %s", e.what());
+        return EXIT_FAILURE;
     }
-}
+  }
 
-fn main() -> Result<(), RclrsError> {
-    let context = Context::default_from_env()?;
-    let mut executor = context.create_basic_executor();
-    let node_wrapper = Lesson04Node::new(&executor)?;
-
-    // Wait for service (simple block)
-    while !node_wrapper.client_component.client.wait_for_service()? {
-        log_info!(node_wrapper.node.logger(), "Waiting for service...");
-        std::thread::sleep(Duration::from_millis(500));
-    }
-
-    // Trigger the request
-    node_wrapper.client_component.send_sample_request(context.clone());
-
-    // Spin until context.shutdown() is called in the thread
-    executor
-        .spin(SpinOptions::default())
-        .ignore_non_errors()
-        .first_error()
-        .map_err(|err| {
-            rclrs::log_error!(node_wrapper.node.logger(), "Executor stopped: {err}");
-            err
-        })?;
-
-    Ok(())
+  return EXIT_SUCCESS;
 }

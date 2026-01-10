@@ -251,27 +251,28 @@ The goal of this workspace is to demonstrate full feature parity between Rust, C
 
 > **Trade-off**: `roslibrust` is ideal for lightweight tools or systems that cannot install the full ROS 2 stack (DDS), but it incurs higher latency due to JSON serialization.
 
+---**Overview**
+You’ve got Lessons 00–03 listed; now you want Lesson 04 added in the same format, consistent with what you’ve implemented (services, logic separation, unit tests, and bridge-safe async behaviour).
+
 ---
 
-## Lessons
+## Lessons (updated with Lesson 04)
 
 1. **Lesson 00**: Bootstrap
-Setup, cargo configuration, and basic logging.
+   Setup, cargo configuration, and basic logging.
 
 2. **Lesson 01**: Event Loop
-
-    **rclrs**: Timers and Executors.
-    
-    **roslibrust**: Async connection handling.
+   **rclrs**: Timers and Executors.
+   **roslibrust**: Async connection handling.
 
 3. **Lesson 02**: Publishers
-
-    **rclrs**: Strongly typed interfaces.
-
-    **roslibrust**: Manual `serde` mapping and async publishing.
+   **rclrs**: Strongly typed interfaces.
+   **roslibrust**: Manual `serde` mapping and async publishing.
 
 4. **Lesson 03**: Subscribers & System Verification
+   **rclrs**: QoS compatibility, logic injection, and reset tolerance.
+   **roslibrust**: Async Streams, state validation inside tasks, and bridge verification.
 
-    **rclrs**: QoS compatibility, logic injection, and reset tolerance.
-
-    **roslibrust**: Async Streams, state validation inside tasks, and bridge verification.
+5. **Lesson 04**: Services & Testability
+   **rclrs**: Service server/client, executor-driven async handling, and parameterised service naming via `utils_rclrs`.
+   **roslibrust**: Manual `serde` service mapping, async service advertise/call over rosbridge with retry, and pure-logic unit tests via `cargo test` (service naming via `utils_roslibrust::services`).

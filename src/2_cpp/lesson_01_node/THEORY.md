@@ -1,10 +1,3 @@
-Brief overview
-Yep — the breakdown needs one targeted correction: replace the `std::bind` explanation with **lambda callback** rationale, and tighten the “type safety” story to what’s actually true in `rclcpp` (compile-time signature + parameter type enforcement).
-
-Below is an updated breakdown section (full file) that matches your current Lesson 01 code exactly.
-
----
-
 # Lesson 01 Breakdown: The Event Loop & Parameters (C++)
 
 ## Architecture: The Event-Driven Node
@@ -130,9 +123,3 @@ try {
 * **Blocking behaviour**: `spin()` runs until shutdown (Ctrl+C or external shutdown).
 * **Exception safety**: a top-level `try/catch` prevents uncontrolled termination if something throws unexpectedly.
 * **Deterministic shutdown**: `rclcpp::shutdown()` ensures DDS resources are released cleanly.
-
----
-
-## One next step only
-
-Replace any remaining `std::bind` usage in later C++ lessons (publishers/subscribers/timers) with lambdas to keep callback style consistent across the track.

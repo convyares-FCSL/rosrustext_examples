@@ -59,7 +59,7 @@ This file tracks the structural, pedagogical, and technical status of the ROS 2 
 | **01** | **Node / Timer** | [X] | [X] | [X] | [X] | [X] |
 | **02** | **Publisher** | [X] | [X] | [X] | [X] | [X] |
 | **03** | **Subscriber** | [X] | [X] | [X] | [X] | [X] |
-| **04** | **Services** | [X] | [X] | [ ] | [ ] | [ ] |
+| **04** | **Services** | [X] | [X] | [X] | [X] | [X] |
 | **05** | **Parameters** | [ ] | [ ] | [ ] | [ ] | [ ] |
 | **06** | **Lifecycle** | [ ] | [ ] | [ ] | [ ] | [ ] |
 | **07** | **Actions** | [ ] | [ ] | [ ] | [ ] | [ ] |
@@ -76,6 +76,7 @@ This file tracks the structural, pedagogical, and technical status of the ROS 2 
   - `roslibrust`: Pinned to `0.18`.
 - [X] **Architecture Refactor**: Split utils into Native vs. Bridge.
 - [X] **Build Isolation**: `rcllibrust` lessons marked `COLCON_IGNORE`.
+- [X] **Fix & Log interfaces**: fix and log interfaces being broken by crate.io.
 - [ ] **Logging consistency**: Ensure `env_logger` (bridge) output format roughly matches ROS 2 logger (native).
 
 ---

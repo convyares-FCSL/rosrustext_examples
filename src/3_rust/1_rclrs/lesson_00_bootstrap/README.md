@@ -1,4 +1,4 @@
-# Lesson 00 (rclrs) - Bootstrap
+# Lesson 00 (Rust / rclrs) - Bootstrap
 
 ## Goal
 Create the smallest possible `rclrs` package and verify it runs.

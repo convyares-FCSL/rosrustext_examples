@@ -1,4 +1,4 @@
-# Lesson 01 (rclrs) – Simple Node (Timer + Logging)
+# Lesson 01 (Rust / rclrs) – Simple Node (Timer + Logging)
 
 ## Goal
 
