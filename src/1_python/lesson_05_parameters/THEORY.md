@@ -1,192 +1,141 @@
-# Lesson 05 Theory: Parameters & Central Configuration (Python / rclpy)
+# Lesson 05 Theory: Parameters & Central Configuration (C++ / rclcpp)
 
 ## Architectural Intent
 
-Lesson 05 is where configuration stops being “a couple of optional flags” and becomes a **first-class system contract**.
+In Lesson 02, we hardcoded behavior (like the publish timer). In Lesson 05, we treat configuration as a **first-class system contract**.
 
-The goal is:
+The goal is to prove that node behavior can be driven, inspected, and safely updated at runtime using ROS parameters, while keeping a single shared YAML schema across languages.
 
-> **Prove that node behaviour can be driven, inspected, and safely updated at runtime using ROS parameters, while keeping a single shared YAML schema across languages.**
+We introduce three production-grade concepts:
 
-This lesson is explicitly ROS-native:
-- Configuration is provided via `--params-file` (startup).
-- Behaviour changes via `ros2 param set` (runtime).
-- Launch-based discovery/wiring is deliberately deferred to Lesson 09.
+1. **Two-Stage Configuration**: Loading defaults from YAML at startup, then modifying them via ROS parameters at runtime.
+2. **Hot Updates**: Using C++ callbacks (`OnSetParametersCallback`) to react to changes without restarting the node.
+3. **Logic Separation**: Keeping validation logic in pure C++ headers (`logic.hpp`), completely isolated from ROS 2 headers.
 
----
+## Code Walkthrough
 
-## What’s New Compared to Lessons 00–04
+### 1. The Header: Logic vs. Transport
 
-Earlier lessons used parameters in a “nice to have” way (e.g., a publish period with a default).
+We explicitly separate the "business logic" (validating the stream) from the "transport mechanism" (ROS 2).
 
-Lesson 05 makes parameters the primary interface:
+**`logic.hpp` (Pure C++)**
+Notice there are no `#include <rclcpp/rclcpp.hpp>` directives here. This class handles state and validation rules only.
 
-- **Startup composition**: multiple `--params-file` inputs combine into one effective parameter set.
-- **Validation before application**: invalid values are rejected or clamped before changing runtime behaviour.
-- **Hot updates**: parameters are actively handled via callbacks, not polled or ignored.
-- **No accidental defaults**: defaults still exist, but are treated as intentional fallbacks (and warnings are only shown when appropriate).
+```cpp
+// Pure C++ logic, testable without ROS
+class TelemetryStreamValidator {
+public:
+  StreamDecision on_count(std::uint64_t count); // Returns decision enum
+private:
+  std::uint64_t expected_{0};
+  std::uint64_t reset_max_value_{1};
+};
 
----
+```
 
-## Configuration Model: Three YAML Files, One Schema
+**`subscriber.hpp` (ROS 2)**
+The ROS node owns the validator and acts as the adapter.
 
-Lesson 05 consumes the same YAML schema used by the rest of the workspace:
+```cpp
+#include "rclcpp/rclcpp.hpp"
+#include "lesson_05_parameters_cpp/logic.hpp"
 
-- `topics_config.yaml` → topic names
-- `qos_config.yaml` → QoS profiles and `qos.default_profile`
-- `services_config.yaml` → service names
+class Lesson05Subscriber : public rclcpp::Node {
+  // ...
+  // The node owns the logic instance
+  std::unique_ptr<TelemetryListener> listener_; 
+};
 
-Each language has a thin adapter layer (`utils_py`, `utils_cpp`, `utils_rclrs`, `utils_rcllibrust`) that:
-- reads parameters (already loaded by ROS)
-- applies defaults when absent
-- returns strongly-typed values (or as close as the language allows)
+```
 
-The node does **not** parse YAML directly. ROS does that at startup. The node just reads parameters.
+### 2. Shared Configuration (`utils_cpp`)
 
----
+Just like in Lesson 02, we avoid hardcoding. However, `utils_cpp` now does more than just return strings—it handles the parameter declaration pattern.
 
-## The “Two-Stage Config” Mental Model
+```cpp
+// 1. Get Topic Name (Standardized)
+// Internally declares 'topics.telemetry' and returns the string "/tutorial/telemetry"
+auto topic = topics::telemetry(*this);
 
-Lesson 05 formalizes a pattern you will reuse everywhere:
+// 2. Get QoS Profile (Configurable)
+// Internally reads 'qos.profiles.telemetry.reliability', etc.
+auto qos_profile = qos::telemetry(*this);
 
-1) **Startup source of truth**  
-   YAML passed in via `--params-file`.
+```
 
-2) **Live source of truth**  
-   Runtime parameter values held in the ROS parameter server and mutated via `ros2 param set`.
+**Why generic templates?**
+In C++, `utils_cpp` uses templates (`get_or_declare_parameter<T>`) to ensure type safety. If you try to read a string parameter into an `int` variable, the compiler or runtime validator will catch it immediately.
 
-This split matters because:
-- YAML is how you standardize fleets and deployments.
-- Runtime parameters are how you debug, tune, and recover without redeploying.
+### 3. The Parameter Callback (RAII)
 
----
+Enabling runtime updates in C++ requires registering a callback. **Crucially**, C++ uses RAII (Resource Acquisition Is Initialization) for this callback.
 
-## Node Structure: Transport vs Logic
+```cpp
+// In class definition
+OnSetParametersCallbackHandle::SharedPtr param_callback_handle_;
 
-In this lesson both publisher and subscriber follow the same boundary:
+// In constructor
+param_callback_handle_ = this->add_on_set_parameters_callback(
+    [this](const std::vector<rclcpp::Parameter> & params) { 
+        return this->on_parameters(params); 
+    });
 
-### 1) Node (ROS resources, lifecycle, callbacks)
-Owns:
-- publishers/subscriptions
-- timers
-- parameter declarations
-- parameter callback registration
-- safe “rebuild” of resources when needed
+```
 
-### 2) Logic (pure behaviour, testable)
-Owns:
-- validation rules (e.g., `timer_period_s > 0`)
-- stream semantics (ordering, resets, tolerance)
+* **The Handle**: We must store `param_callback_handle_` as a member variable. If we don't, the `SharedPtr` goes out of scope at the end of the constructor, the reference count drops to zero, and the callback is **immediately unregistered**.
 
-This is why Lesson 05 keeps lesson-scoped logic in the lesson package (not in global `utils_py`):
-- `utils_py` remains “workspace configuration adapters”.
-- the lesson package remains “behaviour + validation for this lesson”.
+### 4. Runtime Logic: Validate  Rebuild
 
-That separation is what will map cleanly to Rust later (logic can live in `lib.rs` with tests, while node binaries stay thin).
+When a parameter changes, we don't just update a variable. We follow a strict safety pattern.
 
----
+**Publisher Example (`timer_period_s`)**
 
-## Shared Config Utilities: Defaults With Correct Warnings
+```cpp
+rcl_interfaces::msg::SetParametersResult on_parameters(...) {
+    // 1. Validate (Pure Logic)
+    auto valid = validate_timer_period_s(param.as_double());
+    if (!valid.ok) {
+        // Reject the change at the ROS level
+        return {false, valid.reason}; 
+    }
 
-A subtle failure mode in ROS parameter systems is “defaults masking misconfiguration”.
+    // 2. Rebuild Resource (ROS Level)
+    // We cannot just change a timer's period; we recreate it.
+    create_or_update_timer(*valid.value);
+    
+    return {true, ""};
+}
 
-Lesson 05’s `_get_or_declare` helper does two important things:
+```
 
-1) Always declares the parameter (so it appears in `ros2 param list`).
-2) Warns only when:
-   - the effective value equals the default **and**
-   - no override was provided via `--params-file` / `-p`
+This ensures the node never enters an invalid state (e.g., a negative timer period).
 
-This prevents false warnings when YAML correctly sets the same value as the default.
+### 5. Memory Management
 
-Outcome:
-- warnings signal a real condition: “you didn’t supply config, we fell back”.
+We use `std::unique_ptr` for the listener logic to ensure exclusive ownership by the node.
 
----
+```cpp
+listener_ = std::make_unique<TelemetryListener>(this->get_logger(), effective_value);
 
-## Publisher: Parameter-Driven Timer as a Reconfigurable Resource
+```
 
-The publisher’s runtime behaviour is governed by `timer_period_s`.
+* **Efficiency**: The logic object is small and stays in memory.
+* **Safety**: When the node is destroyed (Ctrl+C), the `unique_ptr` automatically destroys the listener, ensuring no memory leaks.
 
-Key property:
+## Testing Strategy
 
-- Changing `timer_period_s` requires rebuilding a ROS resource (the timer).
-- The safe approach is:
-  - validate
-  - cancel old timer
-  - create new timer
-  - update internal state consistently
+Because we separated `logic.hpp` from the ROS node, our unit tests (`test/test.cpp`) do not need to spin up a ROS graph.
 
-This pattern is the practical “production” version of parameter updates: not just accepting values, but applying them safely to runtime resources.
+```cpp
+TEST(TestLogic, StreamResetDetected) {
+  TelemetryStreamValidator v(1); 
+  v.on_count(10); 
+  
+  // We test the business logic directly
+  auto decision = v.on_count(1);
+  EXPECT_EQ(decision.event, StreamEvent::RESET);
+}
 
----
+```
 
-## Subscriber: Stream Semantics as Business Logic
-
-The subscriber is not just “print messages”. It validates transport behaviour as a system property.
-
-The logic layer handles:
-
-- **Late joiners**: first received sample establishes baseline.
-- **Publisher restart/reset**: a sudden drop to a low value can trigger resync.
-- **Out-of-order/stale samples**: detected and logged without corrupting state.
-
-The subscriber’s runtime parameter (`reset_max_value`) changes logic behaviour **without** needing to rebuild ROS resources (it updates the listener state in place).
-
-This is a useful contrast:
-
-- publisher parameter updates → resource rebuild (timer)
-- subscriber parameter updates → logic update (validator state)
-
----
-
-## Why We Compose YAML via CLI in Lesson 05
-
-Lesson 05 uses explicit `--params-file ...` composition on purpose.
-
-It proves:
-- the schema works
-- the nodes are correctly parameter-driven
-- runtime updates behave safely
-
-It does not solve:
-- discovery of installed vs source-tree configs
-- launch-driven wiring
-- environment-based config selection
-
-Those are Lesson 09 problems. Solving them early would hide the key mechanism Lesson 05 is teaching.
-
----
-
-## Testing: What’s Actually Being Verified
-
-Lesson 05 tests avoid requiring a ROS graph.
-
-The unit tests should cover:
-
-- `validate_timer_period_s`:
-  - accepts float/int numeric inputs
-  - rejects non-numeric
-  - rejects <= 0
-- `validate_reset_max_value`:
-  - accepts integers
-  - rejects non-integer inputs
-  - rejects < 0
-
-This reinforces the rule introduced in Lesson 04:
-
-> test logic in isolation, keep ROS integration thin.
-
----
-
-## What This Lesson Establishes
-
-Lesson 05 demonstrates that:
-
-1) Configuration can be standardised across languages using a shared YAML schema.
-2) Node behaviour is correctly defined by the composition of multiple parameter files at startup.
-3) Runtime parameter updates are applied safely and predictably through validation and controlled resource updates.
-4) The codebase supports long-term maintainability by separating testable logic from ROS resource ownership.
-
-This lesson marks the transition from illustrative examples to production-oriented ROS 2 systems.
-
+This makes tests millisecond-fast and deterministic, proving the logic works before we ever try to send a ROS message.

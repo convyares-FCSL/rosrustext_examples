@@ -105,3 +105,6 @@ QoS compatibility, cross-language validation, logic injection for callbacks, and
 
 5. **Lesson 04**: Services & Unit Testing
 Header-only logic libraries, asynchronous clients, and verification with GTest.
+
+6. **Lesson 05**: Parameters & Central Configuration
+Central YAML-driven configuration, parameter declaration and validation via `utils_cpp`, runtime updates with callbacks, and safe behavioural mutation without node restart.

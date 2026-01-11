@@ -33,6 +33,9 @@ scripts/
 ## Usage
 
 ### Build Everything
+
+!!! DO LESSON 00 FIRST TO ENSURE INSTALLATION OF DEPENDENCIES !!! 
+
 ```bash
 ./scripts/build_all.sh
 ```

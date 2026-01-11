@@ -1,157 +1,98 @@
 #pragma once
-//------------------------------------------------------------------------------
-/**
- * @file    qos.hpp
- * @brief   Shared QoS presets and helpers.
- */
-//------------------------------------------------------------------------------
-#include <algorithm>
-#include <chrono>
-#include <cctype>
-#include <string>
 
+#include <string>
+#include <algorithm>
+#include <cctype>
 #include "rclcpp/rclcpp.hpp"
+#include "utils_cpp/utils.hpp"
 
 namespace qos {
 
-inline constexpr int DEFAULT_DEPTH = 10;
-
-inline rclcpp::QoS telemetry(std::size_t depth = DEFAULT_DEPTH) {
-  return rclcpp::QoS{depth}
-      .best_effort()
-      .durability_volatile()
-      .deadline(std::chrono::nanoseconds{0})
-      .keep_last(depth);
-}
-
-inline rclcpp::QoS commands(std::size_t depth = 1) {
-  return rclcpp::QoS{depth}
-      .reliable()
-      .durability_volatile()
-      .keep_last(depth);
-}
-
-inline rclcpp::QoS state_latched(std::size_t depth = 1) {
-  return rclcpp::QoS{depth}
-      .reliable()
-      .transient_local()
-      .keep_last(depth);
-}
+inline constexpr char DEFAULT_PROFILE_NAME[] = "telemetry";
 
 struct ProfileDefaults {
-  const char *reliability;
-  const char *durability;
-  std::size_t depth;
+    std::string reliability;
+    std::string durability;
+    int depth;
 };
 
-inline std::string normalize_profile(const std::string &profile) {
-  std::string key = profile;
-  if (key.empty()) {
-    return "telemetry";
-  }
-  std::transform(key.begin(), key.end(), key.begin(),
-      [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-  if (key == "statelatched") {
-    return "state_latched";
-  }
-  if (key == "reliabledata") {
-    return "reliable_data";
-  }
-  if (key == "staticdatalatched") {
-    return "static_data_latched";
-  }
-  return key;
+// Internal dictionary matching Python's _PROFILES
+inline ProfileDefaults get_defaults_for_key(const std::string& key) {
+    if (key == "commands")            return {"reliable",    "volatile",        1};
+    if (key == "state_latched")       return {"reliable",    "transient_local", 1};
+    if (key == "events")              return {"reliable",    "volatile",        50};
+    if (key == "reliable_data")       return {"reliable",    "volatile",        10};
+    if (key == "static_data_latched") return {"reliable",    "transient_local", 1};
+    // Default / "telemetry"
+    return {"best_effort", "volatile", 10}; 
 }
 
-inline ProfileDefaults defaults_for_profile(const std::string &profile) {
-  if (profile == "commands") {
-    return {"reliable", "volatile", 1};
-  }
-  if (profile == "state_latched") {
-    return {"reliable", "transient_local", 1};
-  }
-  if (profile == "events") {
-    return {"reliable", "volatile", 50};
-  }
-  if (profile == "reliable_data") {
-    return {"reliable", "volatile", DEFAULT_DEPTH};
-  }
-  if (profile == "static_data_latched") {
-    return {"reliable", "transient_local", 1};
-  }
-  return {"best_effort", "volatile", DEFAULT_DEPTH};
+// Internal loader
+inline rclcpp::QoS _load_profile(rclcpp::Node &node, std::string profile_name) {
+    // Normalize key
+    std::string key = profile_name;
+    // (Simple trim/lower logic could be added here if strict matching isn't desired, 
+    // but Python version relies on exact keys or fallback in the dictionary lookup)
+    if (key.empty()) key = DEFAULT_PROFILE_NAME;
+
+    // Get defaults (local C++ defaults, used if params are missing)
+    ProfileDefaults defs = get_defaults_for_key(key);
+    
+    // Construct param base: qos.profiles.<name>
+    std::string base = "qos.profiles." + key;
+
+    // Load individual policies via params
+    std::string rel = utils_cpp::get_or_declare_parameter<std::string>(
+        node, base + ".reliability", defs.reliability, "qos");
+    
+    std::string dur = utils_cpp::get_or_declare_parameter<std::string>(
+        node, base + ".durability", defs.durability, "qos");
+    
+    int depth = utils_cpp::get_or_declare_parameter<int>(
+        node, base + ".depth", defs.depth, "qos");
+
+    // Construct QoS
+    rclcpp::QoS qos(depth);
+
+    if (rel == "best_effort") qos.best_effort();
+    else qos.reliable();
+
+    if (dur == "transient_local") qos.transient_local();
+    else qos.durability_volatile();
+
+    return qos;
 }
 
-// Helper to get or declare a parameter with a default value
-template <typename T>
-T get_or_declare_param(rclcpp::Node &node, const std::string &name, const T &default_value) {
-  if (node.has_parameter(name)) {
-    return node.get_parameter(name).get_value<T>();
-  }
-  return node.declare_parameter<T>(name, default_value);
+// --- Public API ---
+
+inline rclcpp::QoS from_parameters(rclcpp::Node &node) {
+    std::string profile = utils_cpp::get_or_declare_parameter<std::string>(
+        node, "qos.default_profile", DEFAULT_PROFILE_NAME, "qos.default_profile");
+    return _load_profile(node, profile);
 }
 
-// Internal implementation of loading a profile
-inline rclcpp::QoS load_profile(rclcpp::Node &node, const std::string &profile_name) {
-  const auto key = normalize_profile(profile_name);
-  const auto defaults = defaults_for_profile(key);
-  const auto base = std::string("qos.profiles.") + key + ".";
-
-  const auto rel = get_or_declare_param<std::string>(node, base + "reliability", defaults.reliability);
-  const auto durability = get_or_declare_param<std::string>(node, base + "durability", defaults.durability);
-  const auto depth = get_or_declare_param<int>(node, base + "depth", static_cast<int>(defaults.depth));
-
-  auto qos = rclcpp::QoS{static_cast<std::size_t>(depth)};
-  
-  if (rel == "best_effort") {
-    qos.best_effort();
-  } else {
-    qos.reliable();
-  }
-
-  if (durability == "transient_local") {
-    qos.transient_local();
-  } else {
-    qos.durability_volatile();
-  }
-  
-  qos.keep_last(static_cast<std::size_t>(depth));
-  return qos;
-}
-
-// 2. Explicit Profile Getters (Match Python API)
 inline rclcpp::QoS telemetry(rclcpp::Node &node) {
-  return load_profile(node, "telemetry");
+    return _load_profile(node, "telemetry");
 }
 
 inline rclcpp::QoS commands(rclcpp::Node &node) {
-  return load_profile(node, "commands");
+    return _load_profile(node, "commands");
 }
 
 inline rclcpp::QoS state_latched(rclcpp::Node &node) {
-  return load_profile(node, "state_latched");
+    return _load_profile(node, "state_latched");
 }
 
 inline rclcpp::QoS events(rclcpp::Node &node) {
-  return load_profile(node, "events");
+    return _load_profile(node, "events");
 }
 
 inline rclcpp::QoS reliable_data(rclcpp::Node &node) {
-  return load_profile(node, "reliable_data");
+    return _load_profile(node, "reliable_data");
 }
 
 inline rclcpp::QoS static_data_latched(rclcpp::Node &node) {
-  return load_profile(node, "static_data_latched");
+    return _load_profile(node, "static_data_latched");
 }
 
-inline rclcpp::QoS from_parameters(rclcpp::Node &node) {
-  std::string profile_name = "telemetry";
-  if (node.has_parameter("qos.profile")) {
-    profile_name = node.get_parameter("qos.profile").as_string();
-  } else {
-    profile_name = node.declare_parameter<std::string>("qos.profile", "telemetry");
-  }
-  return load_profile(node, profile_name);
-}
-
-}  // namespace qos
+} // namespace qos
