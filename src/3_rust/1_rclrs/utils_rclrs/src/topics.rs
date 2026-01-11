@@ -1,37 +1,19 @@
-use std::sync::Arc;
+use crate::utils::get_or_declare_parameter;
 use rclrs::Node;
+use std::sync::Arc;
 
-/// Topic name constants.
-pub const ROBOT_NEWS_TOPIC: &str = "robot_news";
-pub const NUMBER_TOPIC: &str = "number";
-pub const NUMBER_COUNT_TOPIC: &str = "number_count";
-
-use rclrs::MandatoryParameter;
-
-/// Retrieve the topic name from parameters with a default fallback.
-pub fn from_params(node: &Node, topic_name: &str, default_value: &str) -> String {
-    let param = node.declare_parameter(format!("topics.{}", topic_name).as_str())
-        .default(Arc::from(default_value))
-        .mandatory();
-        
-    param.map(|p: MandatoryParameter<Arc<str>>| p.get().to_string())
-        .unwrap_or_else(|_| default_value.to_string())
-}
-
-pub const CHATTER: &str = "chatter";
+pub const DEFAULT_CHATTER: &str = "/tutorial/chatter";
+pub const DEFAULT_TELEMETRY: &str = "/tutorial/telemetry";
 
 pub fn chatter(node: &Node) -> String {
-    from_params(node, "chatter", CHATTER)
+    // String params MUST be Arc<str> in rclrs
+    let default: Arc<str> = Arc::from(DEFAULT_CHATTER);
+    let val = get_or_declare_parameter(node, "topics.chatter", default, "topic");
+    val.to_string()
 }
 
-pub fn robot_news(node: &Node) -> String {
-    from_params(node, "robot_news", ROBOT_NEWS_TOPIC)
-}
-
-pub fn number(node: &Node) -> String {
-    from_params(node, "number", NUMBER_TOPIC)
-}
-
-pub fn number_count(node: &Node) -> String {
-    from_params(node, "number_count", NUMBER_COUNT_TOPIC)
+pub fn telemetry(node: &Node) -> String {
+    let default: Arc<str> = Arc::from(DEFAULT_TELEMETRY);
+    let val = get_or_declare_parameter(node, "topics.telemetry", default, "topic");
+    val.to_string()
 }
