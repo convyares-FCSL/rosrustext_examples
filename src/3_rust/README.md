@@ -224,7 +224,7 @@ cargo run
    Service patterns, logic isolation, unit tests
 
 6. **Lesson 05** — Parameters & Configuration
-   Central YAML, runtime updates, production-grade patterns
+   Central YAML, runtime updates (rclrs only), production-grade patterns
 
 ---
 

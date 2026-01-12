@@ -7,5 +7,5 @@ sanitize_environment
 
 echo "--> Building Python Lessons..."
 # Builds Python lessons 01, 02, and 03
-colcon build --packages-select lesson_01_node_py lesson_02_publisher_py lesson_03_subscriber_py lesson_04_service_py
+colcon build --packages-select lesson_01_node_py lesson_02_publisher_py lesson_03_subscriber_py lesson_04_service_py lesson_05_parameters_py
 echo "Python Lessons built."
