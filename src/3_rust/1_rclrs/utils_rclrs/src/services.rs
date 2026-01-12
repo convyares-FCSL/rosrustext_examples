@@ -1,22 +1,13 @@
-use std::sync::Arc;
+use crate::utils::declare_parameter;
 use rclrs::Node;
-use rclrs::MandatoryParameter;
+use std::sync::Arc;
 
-/// Service name constants.
-pub const COMPUTE_STATS: &str = "compute_stats";
+pub const DEFAULT_COMPUTE_STATS: &str = "/compute_stats";
 
-/// Retrieve the service name from parameters with a default fallback.
-/// Looks for parameters under "services.<name>"
-pub fn from_params(node: &Node, service_name: &str, default_value: &str) -> String {
-    let param = node.declare_parameter(format!("services.{}", service_name).as_str())
-        .default(Arc::from(default_value))
-        .mandatory();
-        
-    param.map(|p: MandatoryParameter<Arc<str>>| p.get().to_string())
-        .unwrap_or_else(|_| default_value.to_string())
-}
-
-/// Helper to get the compute_stats service name
 pub fn compute_stats(node: &Node) -> String {
-    from_params(node, "compute_stats", COMPUTE_STATS)
+    let default: Arc<str> = Arc::from(DEFAULT_COMPUTE_STATS);
+    let param = declare_parameter(node, "services.compute_stats", default)
+        .expect("Failed to declare parameter: services.compute_stats");
+    let val: Arc<str> = param.get();
+    val.to_string()
 }

@@ -164,16 +164,24 @@ Strict separation between:
 
 ---
 
-### Lesson 05 – Parameters (Planned)
+### Lesson 05 – Parameters & Central Configuration
 
 **Goal**
-Centralised, validated configuration.
+Make configuration explicit, shared, and safely changeable at runtime.
 
 **Focus**
-Runtime updates, parameter callbacks, YAML as source of truth.
+Use ROS parameters as a live configuration interface rather than startup-only defaults.
+
+* validation and runtime updates via parameter callbacks
+* updated, production-style publishers and subscribers
 
 **Architecture**
-Configuration externalised from node code and shared across languages.
+Centralise system configuration while keeping node code explicit and deterministic.
+
+* Central YAML defines topics, services, and QoS
+* Language utilities adapt YAML → parameters → typed access
+* Node behaviour updates safely when configuration changes
+
 
 ---
 

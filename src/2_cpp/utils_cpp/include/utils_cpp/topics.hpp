@@ -1,40 +1,31 @@
 #pragma once
 
 #include <string>
-
 #include "rclcpp/rclcpp.hpp"
+#include "utils_cpp/utils.hpp"
 
 namespace topics {
 
-inline constexpr char CHATTER[] = "chatter";
-inline constexpr char NUMBERS[] = "numbers";
-inline constexpr char COUNTS[] = "counts";
-inline constexpr char ROBOT_NEWS_TOPIC[] = "robot_news";
-inline constexpr char NUMBER_TOPIC[] = "number";
-inline constexpr char NUMBER_COUNT_TOPIC[] = "number_count";
+// Canonical Defaults (matching Python utils_py/topics.py)
+inline constexpr char DEFAULT_CHATTER[] = "/tutorial/chatter";    // Lessons 00-04
+inline constexpr char DEFAULT_TELEMETRY[] = "/tutorial/telemetry"; // Lesson 05
 
-inline std::string from_params(
-    rclcpp::Node &node,
-    const std::string &topic_name,
-    const std::string &default_value) {
-  return node.declare_parameter<std::string>(
-      std::string("topics.") + topic_name, default_value);
-}
-
+/**
+ * @brief Get the chatter topic name (Lessons 00-04).
+ * Param: topics.chatter
+ */
 inline std::string chatter(rclcpp::Node &node) {
-  return from_params(node, "chatter", CHATTER);
+  return utils_cpp::get_or_declare_parameter<std::string>(
+      node, "topics.chatter", DEFAULT_CHATTER, "topic");
 }
 
-inline std::string robot_news(rclcpp::Node &node) {
-  return from_params(node, "robot_news", ROBOT_NEWS_TOPIC);
-}
-
-inline std::string number(rclcpp::Node &node) {
-  return from_params(node, "number", NUMBER_TOPIC);
-}
-
-inline std::string number_count(rclcpp::Node &node) {
-  return from_params(node, "number_count", NUMBER_COUNT_TOPIC);
+/**
+ * @brief Get the telemetry topic name (Lesson 05).
+ * Param: topics.telemetry
+ */
+inline std::string telemetry(rclcpp::Node &node) {
+  return utils_cpp::get_or_declare_parameter<std::string>(
+      node, "topics.telemetry", DEFAULT_TELEMETRY, "topic");
 }
 
 }  // namespace topics

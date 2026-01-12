@@ -2,22 +2,19 @@
 
 #include <string>
 #include "rclcpp/rclcpp.hpp"
+#include "utils_cpp/utils.hpp"
 
 namespace services {
 
-inline constexpr char COMPUTE_STATS[] = "compute_stats";
+inline constexpr char DEFAULT_COMPUTE_STATS[] = "/compute_stats";
 
-// Helper to load service name from parameters (or default)
-inline std::string from_params(
-    rclcpp::Node &node,
-    const std::string &service_name,
-    const std::string &default_value) {
-  return node.declare_parameter<std::string>(
-      std::string("services.") + service_name, default_value);
-}
-
+/**
+ * @brief Get the compute_stats service name.
+ * Param: services.compute_stats
+ */
 inline std::string compute_stats(rclcpp::Node &node) {
-  return from_params(node, COMPUTE_STATS, COMPUTE_STATS);
+  return utils_cpp::get_or_declare_parameter<std::string>(
+      node, "services.compute_stats", DEFAULT_COMPUTE_STATS, "service");
 }
 
 }  // namespace services

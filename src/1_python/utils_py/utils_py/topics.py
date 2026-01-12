@@ -1,30 +1,13 @@
-# Internal helper
-def _from_params(node, topic_key: str, default_value: str) -> str:
-    """Load a topic name from parameters (e.g. topics.chatter), with a default."""
-    param_name = f"topics.{topic_key}"
-    if node.has_parameter(param_name):
-        return node.get_parameter(param_name).value
-    return node.declare_parameter(param_name, default_value).value
+from rclpy.node import Node
+from utils_py import _get_or_declare
+
+# Canonical defaults (used only if no --params-file override is provided)
+DEFAULT_CHATTER = "/tutorial/chatter"      # Lessons 00–04
+DEFAULT_TELEMETRY = "/tutorial/telemetry"  # Lesson 05
+
+def chatter(node: Node) -> str:
+    return _get_or_declare(node, "topics.chatter", DEFAULT_CHATTER, warn_label="topic")
 
 
-# Explicit Topic Accessors
-# These functions ensure consistency across the codebase.
-
-def chatter(node) -> str:
-    """
-    Get the configured topic name for 'chatter'.
-    Default: 'chatter' (which often remaps to /tutorial/chatter via global config)
-    """
-    return _from_params(node, "chatter", "chatter")
-
-def robot_news(node) -> str:
-    """Get the configured topic name for 'robot_news'"""
-    return _from_params(node, "robot_news", "robot_news")
-
-def number(node) -> str:
-    """Get the configured topic name for 'number'"""
-    return _from_params(node, "number", "number")
-
-def number_count(node) -> str:
-    """Get the configured topic name for 'number_count'"""
-    return _from_params(node, "number_count", "number_count")
+def telemetry(node: Node) -> str:
+    return _get_or_declare(node, "topics.telemetry", DEFAULT_TELEMETRY, warn_label="topic")

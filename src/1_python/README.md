@@ -90,19 +90,28 @@ To enable Unit Testing without a full ROS environment, we separate **Business Lo
 
 ---
 
+**Overview**
+
+You just need Lesson 05 added in the same style and abstraction level as 00–04. Below is the updated section with Lesson 05 appended and wording aligned to the Python track.
+
+---
+
 ## Lessons
 
 1. **Lesson 00**: Bootstrap & Lifecycle
-The `main` pattern and clean shutdown semantics.
+   The `main` pattern and clean shutdown semantics.
 
 2. **Lesson 01**: Parameters & Timers
-Event-loop execution and safe state mutation.
+   Event-loop execution and safe state mutation.
 
 3. **Lesson 02**: Publishers & Custom Interfaces
-Composition, shared configuration (`utils_py`), and message definitions.
+   Composition, shared configuration (`utils_py`), and message definitions.
 
 4. **Lesson 03**: Subscribers & System Verification
-QoS compatibility, cross-language validation, logic injection for callbacks, and stream reset tolerance.
+   QoS compatibility, cross-language validation, logic injection for callbacks, and stream reset tolerance.
 
 5. **Lesson 04**: Services & Unit Testing
-Client/Server implementation, asynchronous request handling, and decoupling business logic for verification with `pytest`.
+   Client/server implementation, asynchronous request handling, and decoupling business logic for verification with `pytest`.
+
+6. **Lesson 05**: Parameters & Central Configuration
+   Central YAML-driven configuration, parameter declaration and validation via `utils_py`, runtime updates with callbacks, and safe behavioural mutation without node restart.

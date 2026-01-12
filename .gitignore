@@ -51,4 +51,11 @@ Cargo.lock
 .output.txt
 .cargo/
 /secret/
-capstone
+/capstone/*
+
+# Generated Rust interface overlays (script-managed)
+src/4_interfaces/rcl_interfaces/
+src/4_interfaces/builtin_interfaces/
+src/4_interfaces/service_msgs/
+src/4_interfaces/action_msgs/
+src/4_interfaces/unique_identifier_msgs/

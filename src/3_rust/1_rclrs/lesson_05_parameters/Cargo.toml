@@ -1,0 +1,22 @@
+[package]
+name = "lesson_05_parameters_rclrs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rclrs = { git = "https://github.com/ros2-rust/ros2_rust", tag = "v0.6.0", package = "rclrs" }
+utils_rclrs = { path = "../utils_rclrs" }
+lesson_interfaces = { path = "../../../../install/lesson_interfaces/share/lesson_interfaces/rust" }
+rcl_interfaces = { path = "../../../../install/rcl_interfaces/share/rcl_interfaces/rust" }
+
+[lib]
+name = "lesson_05_logic"
+path = "src/lib.rs"
+
+[[bin]]
+name = "lesson_05_publisher"
+path = "src/bin/lesson_05_publisher.rs"
+
+[[bin]]
+name = "lesson_05_subscriber"
+path = "src/bin/lesson_05_subscriber.rs"

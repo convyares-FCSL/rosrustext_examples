@@ -1,29 +1,41 @@
 /**:
   ros__parameters:
     qos:
-      profile: "telemetry"
+      default_profile: "telemetry"
+
       profiles:
         telemetry:
           reliability: "best_effort"
           durability: "volatile"
+          history: "keep_last"
           depth: 10
+
         commands:
           reliability: "reliable"
           durability: "volatile"
+          history: "keep_last"
           depth: 1
+
         state_latched:
           reliability: "reliable"
           durability: "transient_local"
+          history: "keep_last"
           depth: 1
+
         events:
           reliability: "reliable"
           durability: "volatile"
+          history: "keep_last"
           depth: 50
+
         reliable_data:
           reliability: "reliable"
           durability: "volatile"
+          history: "keep_last"
           depth: 10
+
         static_data_latched:
           reliability: "reliable"
           durability: "transient_local"
+          history: "keep_last"
           depth: 1

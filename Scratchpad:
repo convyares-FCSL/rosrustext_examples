@@ -1,69 +1,152 @@
-### 1. Scratchpad: Lesson 05 Intent
+### Lesson 05 – Parameters & Central Configuration
 
-*Use this as our mental contract for the next few steps.*
+**Lesson 05 establishes configuration as a first-class system concern.**
 
-**Lesson 05: Parameters & Central Configuration**
-
-* **The Vehicle**: Revisit the publisher (`MsgCount` on `chatter`) using **fully parameterised config**.
-* **The Source of Truth**: Central YAML in `lesson_interfaces/config/`.
-* **The Outputs**:
-
-  * The node runs using config loaded from YAML (topic, QoS, rate, behaviour).
-  * Runtime inspection shows the node’s effective parameters.
-  * Updates are applied safely at runtime *where supported*.
+This lesson revisits the existing publisher–subscriber pair and rebuilds it so that **all operational behaviour is driven by parameters**, not embedded in node code.
 
 ---
 
-#### The “New” Concept: Configuration as a System
+## The Vehicle
 
-* **Not hardcoded**: topic names, QoS, publish rate, and behaviour are not embedded in node code.
-* **Validated**: bad config fails fast with clear errors (or clamps with explicit warnings).
-* **Inspectable**: the node can print its “effective config” (post-defaults/post-validation).
-* **Reloadable**:
+* A **publisher** emitting `MsgCount` on a telemetry topic.
+* A **subscriber** validating the same stream.
+* Both nodes consume the **same central configuration** and support **safe runtime updates**.
 
-  * **rclpy / rclcpp / rclrs**: param callbacks apply updates (with safe boundaries).
-  * **roslibrust**: no ROS param server → reload YAML via **SIGHUP** or **file polling/watch**.
+This is a continuation of Lessons 02–03, not a new example.
 
 ---
 
-#### The Architecture
+## The Source of Truth
 
-* **Central YAML** (shared across languages):
+* Central YAML files in `lesson_interfaces/config/`:
 
-  * `topics_config.yaml` → names
-  * `qos_config.yaml` → profiles
-  * `services_config.yaml` → service names
-  * (Optionally) `lesson_05_config.yaml` → node-specific settings (rate, behaviour, which QoS profile to use)
+  * `topics_config.yaml`
+  * `qos_config.yaml`
+  * `services_config.yaml`
 
-* **Language utils** (thin adapters):
+These files define:
 
-  * Load YAML + defaults
-  * Validate + normalise
-  * Provide typed getters:
+* topic names
+* QoS profiles and defaults
+* service names
 
-    * `topics::chatter(...)`
-    * `qos::from_parameters(...)` or `qos::from_profile(...)`
-    * `publisher_config::from_*()`
-
-* **Node code**:
-
-  * Declares parameters (native tracks)
-  * Applies config at startup
-  * Registers update callback / reload hook
-  * Rebuilds resources only when required (QoS/topic changes)
+They are composed explicitly at startup via `--params-file`.
+No launch files, no file discovery, no watchers.
 
 ---
 
-#### The Artifacts
+## What the System Must Do
 
-* Update `lesson_interfaces/config/*.yaml` to a **current, consistent schema**.
-* Update each language’s `utils_*` to read the same schema.
-* Update Lesson 02 publisher into Lesson 05 publisher:
+When Lesson 05 is running correctly:
 
-  * Fully param-driven.
-  * Demonstrates runtime updates + inspection.
-* Add a short “Inspection” section:
+* Nodes start using configuration supplied via YAML + ROS parameters.
+* Effective configuration is visible via standard ROS tools.
+* Supported parameters can be updated at runtime:
 
-  * `ros2 param list/get/set`
-  * `ros2 topic info -v`
-  * show effective config logging
+  * changes are validated
+  * invalid updates are rejected
+  * valid updates apply immediately and safely
+* No node restart is required for supported updates.
+
+---
+
+## The New Concept: Configuration as a System
+
+Lesson 05 moves from *“nodes accept parameters”* to *“configuration is deliberate and observable”*.
+
+* **Not hardcoded**
+  Topic names, QoS, rates, and behavioural limits are not embedded in code.
+
+* **Validated**
+  Parameters are checked before being applied.
+  Bad values fail fast with explicit reasons.
+
+* **Inspectable**
+  Operators can query:
+
+  * declared parameters
+  * current effective values
+  * transport behaviour (QoS)
+
+* **Mutable (where supported)**
+  Runtime updates modify behaviour without rebuilding the node.
+
+---
+
+## Architecture (As Implemented)
+
+### Central YAML
+
+* Shared across all languages.
+* Loaded via ROS parameter mechanisms.
+* No language-specific schema.
+
+### Language Utilities
+
+Thin adapters only:
+
+* declare parameters
+* apply defaults
+* detect external overrides
+* emit warnings when defaults are used unintentionally
+* translate parameters into native types (QoS, strings, numbers)
+
+Utilities do **not**:
+
+* create ROS entities
+* own resources
+* manage lifecycle
+
+### Node Code
+
+Each node:
+
+* declares parameters it owns
+* applies configuration at startup
+* registers parameter callbacks
+* rebuilds ROS resources **only when required**
+
+  * timers rebuilt on rate change
+  * logic updated in place when possible
+
+### Logic
+
+Pure logic is isolated where it is:
+
+* shared
+* stateful
+* meaningfully testable without ROS
+
+Unit tests validate logic and parameter validation **without a ROS graph**.
+
+---
+
+## Artifacts Produced by Lesson 05
+
+* A fully parameter-driven publisher.
+* A fully parameter-driven subscriber.
+* Runtime-safe parameter callbacks.
+* Unit tests covering validation and stream logic.
+* Clear operational workflow:
+
+  * build
+  * test
+  * run
+  * inspect
+  * mutate
+
+---
+
+## What This Lesson Establishes
+
+Lesson 05 is the pivot from *tutorial nodes* to *operational systems*.
+
+After this lesson, configuration:
+
+* is centralized
+* is explicit
+* can be reasoned about
+* can be changed safely
+* behaves consistently across languages
+
+Later lessons will build on this foundation rather than revisiting it.

@@ -1,65 +1,17 @@
+use crate::utils::declare_parameter;
+use rclrs::{Node, QoSDurabilityPolicy, QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy};
 use std::sync::Arc;
-use rclrs::{QoSDurabilityPolicy, Node, QoSProfile, QoSReliabilityPolicy, MandatoryParameter, QoSHistoryPolicy};
 
-/// Create a QosProfile from ROS2 node parameters.
-pub fn from_parameters(node: &Node) -> QoSProfile {
-    let profile = node
-        .declare_parameter("qos.profile")
-        .default(Arc::from("telemetry"))
-        .mandatory()
-        .map(|p: MandatoryParameter<Arc<str>>| p.get().to_string())
-        .unwrap_or_else(|_| "telemetry".to_string());
-    _load_profile_impl(node, &profile)
-}
+pub const DEFAULT_PROFILE_NAME: &str = "telemetry";
 
-fn _load_profile_impl(node: &Node, profile_name: &str) -> QoSProfile {
-   let profile_key = normalize_profile(profile_name);
-    let defaults = defaults_for_profile(&profile_key);
-    let base = format!("qos.profiles.{}.", profile_key);
-    let rel = node
-        .declare_parameter((base.clone() + "reliability").as_str())
-        .default(Arc::from(defaults.reliability))
-        .mandatory()
-        .map(|p: MandatoryParameter<Arc<str>>| p.get().to_string())
-        .unwrap_or_else(|_| defaults.reliability.to_string());
-    let durability = node
-        .declare_parameter((base.clone() + "durability").as_str())
-        .default(Arc::from(defaults.durability))
-        .mandatory()
-        .map(|p: MandatoryParameter<Arc<str>>| p.get().to_string())
-        .unwrap_or_else(|_| defaults.durability.to_string());
-    let depth = node
-        .declare_parameter((base + "depth").as_str())
-        .default(defaults.depth)
-        .mandatory()
-        .map(|p: MandatoryParameter<i64>| p.get())
-        .unwrap_or(defaults.depth);
-
-    let mut qos = QoSProfile::default();
-    qos.history = QoSHistoryPolicy::KeepLast { depth: depth as u32 };
-    if rel == "best_effort" {
-        qos.reliability = QoSReliabilityPolicy::BestEffort;
-    } else {
-        qos.reliability = QoSReliabilityPolicy::Reliable;
-    }
-    if durability == "transient_local" {
-        qos.durability = QoSDurabilityPolicy::TransientLocal;
-    } else {
-        qos.durability = QoSDurabilityPolicy::Volatile;
-    }
-    qos
-}
-
-/// Struct to hold default QoS settings for a profile.
 struct ProfileDefaults {
     reliability: &'static str,
     durability: &'static str,
     depth: i64,
 }
 
-/// Get default QoS settings for a given profile.
-fn defaults_for_profile(profile: &str) -> ProfileDefaults {
-    match profile {
+fn get_defaults_for_key(key: &str) -> ProfileDefaults {
+    match key {
         "commands" => ProfileDefaults {
             reliability: "reliable",
             durability: "volatile",
@@ -93,14 +45,82 @@ fn defaults_for_profile(profile: &str) -> ProfileDefaults {
     }
 }
 
-/// Normalize profile names to standard keys.
-fn normalize_profile(profile: &str) -> String {
-    let key = profile.trim().to_lowercase();
-    match key.as_str() {
-        "" => "telemetry".to_string(),
-        "statelatched" => "state_latched".to_string(),
-        "reliabledata" => "reliable_data".to_string(),
-        "staticdatalatched" => "static_data_latched".to_string(),
-        _ => key,
+fn load_profile(node: &Node, profile_name: &str) -> QoSProfile {
+    let key = if profile_name.is_empty() {
+        DEFAULT_PROFILE_NAME
+    } else {
+        profile_name
+    };
+
+    let defs = get_defaults_for_key(key);
+    let base = format!("qos.profiles.{}.", key);
+
+    // reliability: Arc<str>
+    let rel_default: Arc<str> = Arc::from(defs.reliability);
+    let rel_param = declare_parameter(node, &format!("{}reliability", base), rel_default)
+        .expect("Failed to declare parameter: qos.profiles.*.reliability");
+    let rel: Arc<str> = rel_param.get();
+
+    // durability: Arc<str>
+    let dur_default: Arc<str> = Arc::from(defs.durability);
+    let dur_param = declare_parameter(node, &format!("{}durability", base), dur_default)
+        .expect("Failed to declare parameter: qos.profiles.*.durability");
+    let dur: Arc<str> = dur_param.get();
+
+    // depth: i64
+    let depth_param = declare_parameter(node, &format!("{}depth", base), defs.depth)
+        .expect("Failed to declare parameter: qos.profiles.*.depth");
+    let depth: i64 = depth_param.get();
+
+    QoSProfile {
+        history: QoSHistoryPolicy::KeepLast {
+            depth: depth as u32,
+        },
+        reliability: if rel.as_ref() == "best_effort" {
+            QoSReliabilityPolicy::BestEffort
+        } else {
+            QoSReliabilityPolicy::Reliable
+        },
+        durability: if dur.as_ref() == "transient_local" {
+            QoSDurabilityPolicy::TransientLocal
+        } else {
+            QoSDurabilityPolicy::Volatile
+        },
+        ..QoSProfile::default()
     }
+}
+
+// --- Public API ---
+
+pub fn from_parameters(node: &Node) -> QoSProfile {
+    let default: Arc<str> = Arc::from(DEFAULT_PROFILE_NAME);
+    let profile_param = declare_parameter(node, "qos.default_profile", default)
+        .expect("Failed to declare parameter: qos.default_profile");
+    let profile: Arc<str> = profile_param.get();
+
+    load_profile(node, profile.as_ref())
+}
+
+pub fn telemetry(node: &Node) -> QoSProfile {
+    load_profile(node, "telemetry")
+}
+
+pub fn commands(node: &Node) -> QoSProfile {
+    load_profile(node, "commands")
+}
+
+pub fn state_latched(node: &Node) -> QoSProfile {
+    load_profile(node, "state_latched")
+}
+
+pub fn events(node: &Node) -> QoSProfile {
+    load_profile(node, "events")
+}
+
+pub fn reliable_data(node: &Node) -> QoSProfile {
+    load_profile(node, "reliable_data")
+}
+
+pub fn static_data_latched(node: &Node) -> QoSProfile {
+    load_profile(node, "static_data_latched")
 }

@@ -1,4 +1,4 @@
 /**:
   ros__parameters:
     services:
-      add_two_ints: "/add_two_ints"
+      compute_stats: "/compute_stats"
