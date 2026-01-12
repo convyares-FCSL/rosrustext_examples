@@ -96,7 +96,7 @@ colcon build --packages-select utils_rclrs lesson_interfaces --allow-overriding 
 Because the business logic lives in `src/lib.rs`, it can be tested without ROS:
 
 ```bash
-cd ~/ros2_ws_tutorial/src/3_rust/1_rclrs/lesson_05_parameters_rclrs
+cd ~/ros2_ws_tutorial/src/3_rust/1_rclrs/lesson_05_parameters
 cargo test
 ```
 
@@ -109,6 +109,8 @@ Expected: all stream and publisher logic tests pass.
 Run the publisher with all three config files composed:
 
 ```bash
+cd ~/ros2_ws_tutorial
+source install/setup.bash
 ros2 run lesson_05_parameters_rclrs lesson_05_publisher --ros-args \
   --params-file src/4_interfaces/lesson_interfaces/config/topics_config.yaml \
   --params-file src/4_interfaces/lesson_interfaces/config/qos_config.yaml \
@@ -128,6 +130,8 @@ ros2 run lesson_05_parameters_rclrs lesson_05_publisher --ros-args \
 In a second terminal:
 
 ```bash
+cd ~/ros2_ws_tutorial
+source install/setup.bash
 ros2 run lesson_05_parameters_rclrs lesson_05_subscriber --ros-args \
   --params-file src/4_interfaces/lesson_interfaces/config/topics_config.yaml \
   --params-file src/4_interfaces/lesson_interfaces/config/qos_config.yaml

@@ -1,175 +1,274 @@
-# Lesson 04 Breakdown: Services, Async Clients, and Testability (Rust)
+# Lesson 05 Theory: Parameters & Central Configuration (Rust / rclrs)
 
 ## Architectural Intent
 
-Lesson 04 introduces the **Request–Response** communication model using ROS 2 Services.
+In earlier lessons, node behaviour was hardcoded (publish rate, topic names, QoS).
 
-Unlike Topics (Lesson 03), services are **discrete interactions**: a client issues a request and receives a single response. This lesson focuses on implementing services in a way that is:
+In Lesson 05, configuration becomes a **first-class system contract**.
 
-* **Testable**
-* **Non-blocking**
-* **Architecturally clean**
-* **Idiomatic Rust**
+The goal is to demonstrate that, even with an evolving Rust client library (`rclrs`), we can:
 
-The emphasis is not on “calling a service”, but on building **professional service components** that scale.
+1. **Load configuration centrally from YAML at startup**
+2. **Inspect and modify behaviour at runtime using ROS parameters**
+3. **Keep business logic isolated from middleware concerns**
+4. **Apply updates safely without restarting the process**
+
+This lesson mirrors the C++ (`rclcpp`) architecture as closely as the current Rust ecosystem allows.
 
 ---
 
-## Core Principle: Logic Separation (Pure Rust Library)
+## Core Concepts Introduced
 
-Service callbacks must remain **thin adapters**. All business logic is implemented in a pure Rust library (`lib.rs`) with no ROS dependencies.
+Lesson 05 introduces three production-grade patterns:
+
+1. **Configuration-First Design**
+   Topic names, QoS, and behavioural parameters are no longer hardcoded.
+   They are defined in shared YAML files and consumed uniformly across nodes.
+
+2. **Hot Updates via a Control Plane**
+   Runtime configuration changes are applied while the node is running.
+
+3. **Logic / Transport Separation**
+   Validation and sequencing logic lives in pure Rust, independent of ROS 2.
+
+---
+
+## Code Structure Overview
 
 ```text
-service_server.rs   (ROS adapter)
- └── lib.rs         (Pure Rust logic)
+3_rust/
+ ├── utils_rclrs                (Shared Configuration Adapter)
+ └── lesson_05_parameters
+     ├── lib.rs                 (Pure Business Logic)
+     └── bin/*.rs               (Middleware Adapters)
 ```
 
-### Why this matters
-
-Separating logic from middleware provides:
-
-1. **Deterministic unit testing** without ROS.
-2. **Reusability** outside ROS (CLI tools, batch jobs, simulations).
-3. **Clear ownership boundaries** between computation and transport.
-4. **Predictable failure modes** (logic bugs vs. communication bugs).
+Each layer has a single responsibility.
 
 ---
 
-## Business Logic Design
+## 1. Pure Logic: `lib.rs` (No ROS Dependencies)
 
-The core logic is implemented as a pure function:
+As in the C++ lesson, **all business logic is middleware-free**.
 
 ```rust
-pub fn compute(data: &[f64]) -> StatsResult
+// Pure Rust logic, testable without ROS
+pub struct TelemetryStreamValidator {
+    expected: i64,
+    reset_max_value: i64,
+}
+
+impl TelemetryStreamValidator {
+    pub fn on_count(&mut self, count: i64) -> StreamDecision {
+        // validation logic
+    }
+}
 ```
 
-### Key properties
+Key properties:
 
-* Accepts a **slice** (`&[f64]`) — no allocation or ownership transfer.
-* Returns a simple struct (`StatsResult`) — no ROS types.
-* Encodes **semantic state** in `status` rather than throwing errors.
-* Handles edge cases (empty input) deterministically.
+* No `rclrs` imports
+* No threading or timers
+* Deterministic and unit-testable
+* Mirrors `logic.hpp` in the C++ version
 
-### Unit Testing
+This guarantees correctness *before* integration with ROS.
 
-Because the logic is middleware-free, it is verified using standard Rust tests:
+---
+
+## 2. Shared Configuration Adapter: `utils_rclrs`
+
+utils_rclrs lives outside individual lessons and is shared across all Rust examples, enforcing a single workspace-wide configuration standard, exactly like utils_cpp in the C++ track.
+
+Just like `utils_cpp`, the Rust `utils_rclrs` crate centralises system knowledge:
+
+```rust
+let topic = topics::telemetry(&node);
+let qos   = qos::telemetry(&node);
+```
+
+### What `utils_rclrs` Actually Does (Important)
+
+`utils_rclrs` **does not load YAML**.
+
+Instead:
+
+1. YAML files are loaded by ROS **before** the node starts
+2. `declare_parameter` registers the parameter with the node
+3. `MandatoryParameter<T>` provides typed access to the effective value
+4. If no override exists, the declared default is used
+
+This matches C++ behaviour exactly.
+
+```rust
+pub fn declare_parameter<T>(
+    node: &Node,
+    name: &str,
+    default_value: T,
+) -> Result<MandatoryParameter<T>, DeclarationError>
+where
+    T: ParameterVariant + Clone + 'static,
+{
+    node.declare_parameter(name)
+        .default(default_value)
+        .mandatory()
+}
+```
+
+Across the entire Rust workspace, the adapter guarantees:
+
+* One canonical parameter name
+* One canonical type
+* Identical resolution across publisher and subscriber
+
+---
+
+## 3. Middleware Adapter: The Node (Rust / rclrs)
+
+The node owns:
+
+* ROS resources (publishers, subscriptions, timers)
+* The logic object
+* The configuration handles
+
+It acts as the **adapter** between ROS parameters and pure logic.
+
+---
+
+## 4. Runtime Updates: The “Hotfix” Control Plane
+
+### Why Polling Exists in Rust
+
+As of `rclrs v0.6.x`, there is **no equivalent** to:
+
+```cpp
+add_on_set_parameters_callback(...)
+```
+
+Rather than hiding this limitation, Lesson 05 makes it explicit and uses a **Control Plane / Data Plane split**.
+
+---
+
+### Control Plane vs Data Plane
+
+```rust
+// Data Plane (High frequency, deterministic)
+fn on_tick(&self) {
+    // publish data
+}
+
+// Control Plane (Low frequency, ~1 Hz)
+fn check_parameters(&self) {
+    let current = period_param.get();
+    if current != last {
+        // apply update
+    }
+}
+```
+
+Key properties:
+
+* Configuration polling is **low priority**
+* Publishing logic is **never blocked**
+* Behaviour matches callback semantics in practice
+
+This mirrors the intent of the C++ callback, even if the mechanism differs.
+
+---
+
+## 5. Update Strategy 1: Rebuild-on-Update (Publisher)
+
+**Use case:** Changing infrastructure resources (timers).
+
+In Rust, as in C++, we do **not** mutate a running timer.
+
+Instead:
+
+1. Validate the new value (pure logic)
+2. Construct a new `rclrs::Timer`
+3. Swap it into a `Mutex<Option<Timer>>`
+4. Drop the old timer safely
+
+```rust
+fn on_param_change(new_period_ms: u64) {
+    create_or_update_timer(new_period_ms);
+}
+```
+
+This guarantees:
+
+* No partial state
+* No undefined timing behaviour
+* No race conditions
+
+This is the same strategy as the C++ `create_or_update_timer`.
+
+---
+
+## 6. Update Strategy 2: In-Place Mutation (Subscriber)
+
+**Use case:** Logic thresholds (`reset_max_value`).
+
+Here we mutate only the logic state:
+
+```rust
+let mut v = validator.lock().unwrap();
+v.set_reset_max_value(new_value);
+```
+
+Why this is safe:
+
+* The subscription remains unchanged
+* Only a single integer is updated
+* The next message uses the new value immediately
+
+This mirrors the C++ approach of updating the validator without rebuilding the subscription.
+
+---
+
+## Memory & Ownership Model (Rust Perspective)
+
+Rust enforces ownership at compile time:
+
+* `Arc<Mutex<T>>` replaces `std::unique_ptr`
+* Explicit locking replaces implicit thread safety
+* Lifetimes are enforced by the type system
+
+While more verbose, this eliminates entire classes of runtime errors.
+
+---
+
+## Testing Strategy
+
+Because logic is isolated:
 
 ```bash
 cargo test
 ```
 
-This confirms algorithm correctness **before any ROS node is launched**.
+Unit tests validate:
 
----
+* Stream ordering
+* Reset detection
+* Period quantisation
 
-## The Server Pattern: Adapter, Not Logic
-
-The service server acts as a **strict adapter**.
-
-Its responsibilities are limited to:
-
-1. Receiving a `ComputeStats_Request`
-2. Delegating to `compute(&request.data)`
-3. Translating `StatsResult` → `ComputeStats_Response`
-4. Logging results
-
-The server **does not** perform calculations or enforce business rules.
-
-### Service Callback Form
-
-In `rclrs` v0.6.x, the service callback uses the single-argument form:
-
-```rust
-move |request: ComputeStats_Request| -> ComputeStats_Response { ... }
-```
-
-This keeps the callback minimal and aligns with the executor-managed lifecycle.
-
----
-
-## The Client Pattern: Asynchronous and Executor-Safe
-
-Although services are conceptually synchronous, their implementation **must be asynchronous** to avoid blocking the executor.
-
-### Design Constraints
-
-* The executor must continue spinning to deliver responses.
-* Blocking calls inside callbacks or the main thread can stall the node.
-* The client must integrate cleanly with the event loop.
-
-### Implemented Pattern
-
-1. **Discovery**
-   The client waits for the service using `service_is_ready()`.
-
-2. **Dispatch**
-   The request is sent using `call_then(...)`, which registers a response callback.
-
-3. **Execution**
-   `executor.spin(...)` drives the callback when the response arrives.
-
-This guarantees:
-
-* No deadlocks
-* No busy waiting
-* No thread management in user code
-
-The executor remains the single coordination mechanism.
-
----
-
-## Type Safety and Explicitness
-
-Rust’s type system enforces clarity in asynchronous callbacks.
-
-In the client, the response type is explicitly annotated:
-
-```rust
-move |response: ComputeStats_Response| { ... }
-```
-
-This removes ambiguity in generic contexts and makes callback intent explicit — an important practice in production Rust code.
-
----
-
-## Error Handling and Executor Control
-
-Executor shutdown and error handling use the `RclrsErrorFilter` trait:
-
-```rust
-.spin(...)
-.ignore_non_errors()
-.first_error()
-```
-
-This pattern ensures:
-
-* Clean shutdown on fatal errors
-* Signal handling remains centralized
-* Middleware noise does not terminate the process prematurely
-
----
-
-## Configuration via Shared Utilities
-
-Service names are resolved via `utils_rclrs::services`, not hardcoded strings.
-
-Benefits:
-
-* Single source of truth
-* Consistent naming across server, client, and CLI
-* Safe refactoring without touching node logic
+No ROS graph is required, just like in the C++ lesson.
 
 ---
 
 ## Why This Lesson Matters
 
-Lesson 04 establishes a **repeatable service architecture** in Rust:
+Lesson 05 demonstrates **professional-grade systems engineering in Rust**:
 
-* Business logic is verified through unit tests
-* ROS nodes are thin, predictable adapters
-* Clients are asynchronous and executor-safe
-* Configuration is centralized
-* The system scales without increasing complexity
+* Configuration is external and inspectable
+* Logic is deterministic and testable
+* Runtime updates are safe and controlled
+* Middleware limitations are handled explicitly, not hidden
 
-This pattern forms the foundation for all higher-level service-based systems, including orchestration layers, diagnostics services, and supervisory control.
+This architecture scales directly to:
+
+* Larger systems
+* Multiple nodes
+* Mixed Rust / C++ deployments
+
+It establishes a **shared mental model** across languages, not just shared YAML files.

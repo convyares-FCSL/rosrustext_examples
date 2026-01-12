@@ -1,43 +1,27 @@
-use rclrs::{log_error, log_warn, Node, ParameterVariant};
-use std::fmt::Display;
+use rclrs::{DeclarationError, MandatoryParameter, Node, ParameterVariant};
+use std::fmt::Debug;
 
-/// Declares a parameter if not present, returns the effective value.
+/// Declare a parameter (or reuse existing declaration) and return a typed handle.
 ///
-/// # Arguments
-/// * `node` - Reference to the ROS 2 node.
-/// * `name` - The parameter name.
-/// * `default_value` - The default value.
-/// * `warn_label` - Label for logging.
-pub fn get_or_declare_parameter<T>(
+/// ROS 2 merges parameter overrides (YAML/CLI) before node creation, so `param.get()`
+/// always returns the effective value. We do **not** try to guess whether it came
+/// from YAML vs default (that’s not reliably inferable).
+pub fn declare_parameter<T>(
     node: &Node,
     name: &str,
     default_value: T,
-    warn_label: &str,
-) -> T
+) -> Result<MandatoryParameter<T>, DeclarationError>
 where
-    // T must be a valid ROS parameter type (Arc<str>, i64, bool, etc.)
-    T: ParameterVariant + Clone + PartialEq + Display + std::fmt::Debug + 'static,
+    T: ParameterVariant + Clone + Debug + 'static,
 {
-    // 1. Declare and Get
-    let param_result = node
+    let param = node
         .declare_parameter(name)
-        .default(default_value.clone())
-        .mandatory();
+        .default(default_value)
+        .mandatory()?;
 
-    match param_result {
-        Ok(param) => {
-            let value: T = param.get();
+    // Optional: log effective value once at startup (boring, truthful).
+    // let value: T = param.get();
+    // rclrs::log_info!(node.logger(), "[config] {} = {:?}", name, value);
 
-            // 2. Warn if using default
-            if value == default_value {
-                log_warn!(node.logger(), "[config] Using default {}: {}='{:?}' (no external override detected)", warn_label, name, value);
-            }
-            value
-        }
-        Err(e) => {
-            log_error!(node.logger(),"Failed to declare parameter '{}': {}",name,e);
-
-            default_value
-        }
-    }
+    Ok(param)
 }

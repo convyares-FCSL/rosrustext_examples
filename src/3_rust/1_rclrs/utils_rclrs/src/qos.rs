@@ -1,4 +1,4 @@
-use crate::utils::get_or_declare_parameter;
+use crate::utils::declare_parameter;
 use rclrs::{Node, QoSDurabilityPolicy, QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy};
 use std::sync::Arc;
 
@@ -55,36 +55,27 @@ fn load_profile(node: &Node, profile_name: &str) -> QoSProfile {
     let defs = get_defaults_for_key(key);
     let base = format!("qos.profiles.{}.", key);
 
-    // Load reliability (must use Arc<str> for string params)
+    // reliability: Arc<str>
     let rel_default: Arc<str> = Arc::from(defs.reliability);
-    let rel = get_or_declare_parameter(
-        node,
-        &format!("{}reliability", base),
-        rel_default,
-        "qos",
-    );
+    let rel_param = declare_parameter(node, &format!("{}reliability", base), rel_default)
+        .expect("Failed to declare parameter: qos.profiles.*.reliability");
+    let rel: Arc<str> = rel_param.get();
 
-    // Load durability
+    // durability: Arc<str>
     let dur_default: Arc<str> = Arc::from(defs.durability);
-    let dur = get_or_declare_parameter(
-        node,
-        &format!("{}durability", base),
-        dur_default,
-        "qos",
-    );
+    let dur_param = declare_parameter(node, &format!("{}durability", base), dur_default)
+        .expect("Failed to declare parameter: qos.profiles.*.durability");
+    let dur: Arc<str> = dur_param.get();
 
-    // Load depth (i64 is valid)
-    let depth = get_or_declare_parameter(
-        node,
-        &format!("{}depth", base),
-        defs.depth,
-        "qos",
-    );
+    // depth: i64
+    let depth_param = declare_parameter(node, &format!("{}depth", base), defs.depth)
+        .expect("Failed to declare parameter: qos.profiles.*.depth");
+    let depth: i64 = depth_param.get();
 
-    // Construct QoS
-    // Note: use .as_ref() to compare Arc<str> to &str
     QoSProfile {
-        history: QoSHistoryPolicy::KeepLast { depth: depth as u32 },
+        history: QoSHistoryPolicy::KeepLast {
+            depth: depth as u32,
+        },
         reliability: if rel.as_ref() == "best_effort" {
             QoSReliabilityPolicy::BestEffort
         } else {
@@ -103,14 +94,11 @@ fn load_profile(node: &Node, profile_name: &str) -> QoSProfile {
 
 pub fn from_parameters(node: &Node) -> QoSProfile {
     let default: Arc<str> = Arc::from(DEFAULT_PROFILE_NAME);
-    let profile = get_or_declare_parameter(
-        node,
-        "qos.default_profile",
-        default,
-        "qos.default_profile",
-    );
-    // Convert Arc<str> -> &str for internal logic
-    load_profile(node, &profile)
+    let profile_param = declare_parameter(node, "qos.default_profile", default)
+        .expect("Failed to declare parameter: qos.default_profile");
+    let profile: Arc<str> = profile_param.get();
+
+    load_profile(node, profile.as_ref())
 }
 
 pub fn telemetry(node: &Node) -> QoSProfile {

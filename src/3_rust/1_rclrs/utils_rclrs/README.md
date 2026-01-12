@@ -16,9 +16,7 @@ This keeps lesson nodes free of hardcoded strings and makes config consistent ac
 
 - Nodes should **not** hardcode topic/service strings.
 - Nodes should obtain config through `utils_rclrs` helpers.
-- Defaults exist to keep examples runnable, but:
-  - If no external override is provided (e.g. no `--params-file`), we **warn**.
-  - If a value is overridden via ROS parameters, we do **not** warn.
+- Defaults are provided to keep examples runnable, but can be overridden via standard ROS 2 mechanisms (CLI args or YAML files).
 
 ---
 
@@ -26,13 +24,14 @@ This keeps lesson nodes free of hardcoded strings and makes config consistent ac
 
 All helpers follow the same pattern:
 
-1. **Declare** the parameter (so it appears in `ros2 param list/get`).
-2. **Read** the effective value.
-3. **Warn** only if the value equals the default **and** it was not overridden externally.
+1. **Declare** the parameter via `rclrs` (making it available in `ros2 param list/get`).
+2. **Return** the effective value (either the external override or the compiled-in default).
 
 The shared helper is:
 
-- `utils_rclrs::utils::get_or_declare_parameter(node, name, default, warn_label)`
+- `utils_rclrs::utils::declare_parameter(node, name, default_value)`
+
+This wrapper declares a **mandatory** parameter with a default value, ensuring the node always has valid configuration data.
 
 ---
 
@@ -72,14 +71,14 @@ Module: `utils_rclrs::qos`
 
 Provides:
 
-* `qos::from_parameters(node)` (uses `qos.default_profile`)
+* `qos::from_parameters(node)` (uses `qos.default_profile` to determine which profile to load)
 * explicit profile getters:
   * `qos::telemetry(node)`
   * `qos::commands(node)`
   * `qos::state_latched(node)`
   * etc...
 
-These resolve ROS parameters like:
+These resolve ROS parameters following the pattern `qos.profiles.<profile_name>.<policy>`:
 
 * `qos.default_profile`
 * `qos.profiles.telemetry.reliability`
@@ -94,3 +93,11 @@ From workspace root:
 
 ```bash
 colcon build --packages-select utils_rclrs
+
+```
+
+### Summary of Changes
+
+* **Renamed Helper Function:** Changed `get_or_declare_parameter` to `declare_parameter` to match the function signature in `utils.rs`.
+* **Removed Warning Logic:** Removed the section stating the code "Warns only if the value equals the default," as `utils.rs` does not contain logic to compare effective values against defaults or log warnings.
+* **Clarified Design Rules:** Simplified the rules to reflect that the code simply declares parameters with defaults allowing for standard ROS 2 overrides.

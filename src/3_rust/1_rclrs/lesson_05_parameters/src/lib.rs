@@ -1,3 +1,5 @@
+// utils.rs (or lib.rs in lesson_05_parameters_rclrs)
+
 use lesson_interfaces::msg::MsgCount;
 
 // --- Publisher Logic ---
@@ -112,12 +114,32 @@ impl TelemetryStreamValidator {
         self.expected = count + 1;
         StreamDecision {
             event: StreamEvent::OutOfOrder,
-            message: format!(
-                "Out of order! Received {}, expected {}",
-                count, old_expected
-            ),
+            message: format!("Out of order! Received {}, expected {}", count, old_expected),
         }
     }
+}
+
+// --- Time / Configuration Helpers ---
+
+/// Converts a period expressed in seconds (as a floating point parameter value)
+/// into a quantized millisecond period.
+///
+/// This is intentionally strict and side-effect free:
+/// - Rejects non-finite values and non-positive periods.
+/// - Quantizes to milliseconds using rounding to avoid churn from tiny float noise.
+///
+/// The node layer decides how to surface errors (logging, parameter rejection, etc).
+pub fn period_s_to_ms_strict(period_s: f64) -> Result<u64, String> {
+    if !period_s.is_finite() || period_s <= 0.0 {
+        return Err("timer_period_s must be finite and > 0.0".to_string());
+    }
+
+    let ms_f = (period_s * 1000.0).round();
+    if !ms_f.is_finite() || ms_f <= 0.0 || ms_f > (u64::MAX as f64) {
+        return Err("timer_period_s is out of supported range".to_string());
+    }
+
+    Ok(ms_f as u64)
 }
 
 #[cfg(test)]
@@ -145,5 +167,21 @@ mod tests {
         v.on_count(10);
         let d = v.on_count(20);
         assert_eq!(d.event, StreamEvent::OutOfOrder);
+    }
+
+    #[test]
+    fn test_period_s_to_ms_strict_rejects_invalid() {
+        assert!(period_s_to_ms_strict(f64::NAN).is_err());
+        assert!(period_s_to_ms_strict(f64::INFINITY).is_err());
+        assert!(period_s_to_ms_strict(0.0).is_err());
+        assert!(period_s_to_ms_strict(-1.0).is_err());
+    }
+
+    #[test]
+    fn test_period_s_to_ms_strict_quantizes() {
+        // 1.2344s -> 1234ms
+        assert_eq!(period_s_to_ms_strict(1.2344).unwrap(), 1234);
+        // 1.2346s -> 1235ms
+        assert_eq!(period_s_to_ms_strict(1.2346).unwrap(), 1235);
     }
 }
