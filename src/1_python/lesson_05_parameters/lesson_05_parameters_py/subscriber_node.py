@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+"""
+Lesson 05 Subscriber Node.
+Demonstrates Logic/Component/Node separation.
+"""
 from __future__ import annotations
 
 from typing import List, Optional
@@ -10,86 +14,73 @@ from rclpy.node import Node
 from lesson_interfaces.msg import MsgCount
 from utils_py import qos, topics
 
-from lesson_05_parameters_py.logic import StreamEvent, TelemetryStreamValidator
-from lesson_05_parameters_py.utils import validate_reset_max_value
+from lesson_05_parameters_py.logic import TelemetryStreamValidator, StreamEvent
 
 
-class TelemetryListener:
+class TelemetrySubscriber:
     """
-    ROS callback adapter: converts ROS message into domain-level validation decisions.
+    Encapsulates subscription logic and resource ownership.
     """
 
-    __slots__ = ("_logger", "_validator")
+    def __init__(self, node: Node) -> None:
+        # 1. Instantiate Pure Logic
+        self._logic = TelemetryStreamValidator()
 
-    def __init__(self, logger, *, reset_max_value: int = 1) -> None:
-        self._logger = logger
-        self._validator = TelemetryStreamValidator(reset_max_value=reset_max_value)
+        # 2. Setup ROS Resources
+        topic = topics.telemetry(node)
+        profile = qos.telemetry(node)
+        
+        self._sub = node.create_subscription(MsgCount, topic, self._on_message, profile)
+        self._logger = node.get_logger()
+        self._logger.info(f"TelemetrySubscriber listening on '{topic}'")
 
-    def set_reset_max_value(self, value: int) -> None:
-        self._validator.set_reset_max_value(value)
+    def update_config(self, reset_max_value: int) -> None:
+        """Push config to logic."""
+        self._logic.set_reset_max_value(reset_max_value)
 
-    def __call__(self, msg: MsgCount) -> None:
-        decision = self._validator.on_count(int(msg.count))
+    def _on_message(self, msg: MsgCount) -> None:
+        """Translate ROS Msg -> Logic Decision -> Side Effect."""
+        decision = self._logic.on_count(msg.count)
 
         if decision.event == StreamEvent.RESET:
             self._logger.warn(decision.message)
-            return
-
-        if decision.event == StreamEvent.OUT_OF_ORDER:
-            self._logger.warn(decision.message)
-            return
-
-        self._logger.info(decision.message)
+        elif decision.event == StreamEvent.OUT_OF_ORDER:
+            self._logger.error(decision.message)
+        else:
+            self._logger.info(decision.message)
 
 
 class Lesson05SubscriberNode(Node):
+    """
+    Manages parameters and component lifecycle.
+    """
+
     def __init__(self) -> None:
         super().__init__("lesson_05_subscriber")
 
-        self._topic_name = ""
-        self._subscription = None
-
+        # 1. Setup
         self._declare_parameters()
-        self._setup_subscription()
-        self._setup_parameter_callbacks()
+        self._telemetry = TelemetrySubscriber(self)
 
-        self.get_logger().info(f"Lesson 05 subscriber started. Subscribing to '{self._topic_name}'")
+        # 2. Initial Config
+        initial_val = self.get_parameter("subscriber.reset_max_value").value
+        self._telemetry.update_config(int(initial_val))
+
+        # 3. Callbacks
+        self.add_on_set_parameters_callback(self._on_param_update)
 
     def _declare_parameters(self) -> None:
-        self.declare_parameter("reset_max_value", 1)
+        self.declare_parameter("subscriber.reset_max_value", 10)
 
-    def _setup_subscription(self) -> None:
-        self._topic_name = topics.telemetry(self)
-        qos_profile = qos.telemetry(self)
-
-        raw_reset_max = self.get_parameter("reset_max_value").value
-        validation = validate_reset_max_value(raw_reset_max)
-        reset_max_value = validation.value if validation.ok else 1
-
-        self._listener = TelemetryListener(self.get_logger(), reset_max_value=reset_max_value)
-
-        self._subscription = self.create_subscription(
-            MsgCount,
-            self._topic_name,
-            self._listener,
-            qos_profile,
-        )
-
-    def _setup_parameter_callbacks(self) -> None:
-        self.add_on_set_parameters_callback(self._on_parameters)
-
-    def _on_parameters(self, parameters) -> SetParametersResult:
-        for parameter in parameters:
-            if parameter.name != "reset_max_value":
-                continue
-
-            validation = validate_reset_max_value(parameter.value)
-            if not validation.ok:
-                return SetParametersResult(successful=False, reason=validation.reason)
-
-            self._listener.set_reset_max_value(validation.value)
-            self.get_logger().info(f"Updated reset_max_value -> {validation.value}")
-
+    def _on_param_update(self, parameters: List[rclpy.Parameter]) -> SetParametersResult:
+        for p in parameters:
+            if p.name == "subscriber.reset_max_value":
+                try:
+                    self._telemetry.update_config(int(p.value))
+                    self.get_logger().info(f"Updated reset tolerance to {p.value}")
+                except ValueError:
+                    return SetParametersResult(successful=False)
+        
         return SetParametersResult(successful=True)
 
 
@@ -104,7 +95,7 @@ def main(args: Optional[List[str]] = None) -> None:
         pass
     except Exception as exc:
         logger = rclpy.logging.get_logger("lesson_05_subscriber")
-        logger.error(f"Exception in main: {exc}")
+        logger.error(f"Unhandled exception: {exc}")
     finally:
         if node is not None:
             node.destroy_node()

@@ -185,16 +185,23 @@ Centralise system configuration while keeping node code explicit and determinist
 
 ---
 
-### Lesson 06 – Lifecycle Publisher (Planned)
+### Lesson 06 – Lifecycle Management (Managed Nodes)
 
 **Goal**
-Introduce managed nodes.
+Establish the "Managed Node" pattern where nodes wait for orchestration rather than starting immediately.
 
 **Focus**
-Lifecycle transitions, controlled activation.
+The ROS 2 Lifecycle State Machine (Unconfigured  Inactive  Active).
+
+* **Deterministic Startup**: Orchestrating a fleet using a Manager Node.
+* **Gated Execution**: Publishers and timers that are silent unless `Active`.
+* **Verification**: Automated integration testing (`launch_testing`) and standard compliance check (Nav2).
 
 **Architecture**
-Resources created on `configure`, activated explicitly, destroyed cleanly.
+
+* **State Ownership**: Native inheritance (`rclpy`/`rclcpp`) or `rosrustext` adapters (Rust).
+* **Gated Resources**: LifecyclePublishers and LifecycleTimers used to enforce state contracts.
+* **Orchestration Layer**: A dedicated package containing a Custom Manager Node and Integration Test suite.
 
 ---
 

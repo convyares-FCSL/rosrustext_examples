@@ -1,15 +1,15 @@
 """
 Pure Business Logic (No ROS dependencies).
+Unit testable.
 """
 from dataclasses import dataclass
 from enum import Enum
-
 
 # --- Publisher Logic ---
 
 class TelemetryGenerator:
     """
-    Manages the internal state for the telemetry stream.
+    Generates the sequence of data.
     """
     __slots__ = ("_count",)
 
@@ -31,7 +31,6 @@ class StreamEvent(str, Enum):
     OUT_OF_ORDER = "out_of_order"
     OK = "ok"
 
-
 @dataclass
 class StreamDecision:
     event: StreamEvent
@@ -39,12 +38,11 @@ class StreamDecision:
     expected_after: int
     message: str
 
-
 class TelemetryStreamValidator:
     """
     Validates a monotonically increasing counter stream with reset tolerance.
     """
-
+    # ... (Keep existing Validator code exactly as before) ...
     __slots__ = ("_initialized", "_expected", "_reset_max_value")
 
     def __init__(self, *, reset_max_value: int = 1) -> None:
@@ -57,38 +55,17 @@ class TelemetryStreamValidator:
 
     def on_count(self, count: int) -> StreamDecision:
         c = int(count)
-
         if not self._initialized:
             self._initialized = True
             self._expected = c + 1
-            return StreamDecision(
-                event=StreamEvent.INITIAL,
-                count=c,
-                expected_after=self._expected,
-                message=f"Received (initial): {c}",
-            )
+            return StreamDecision(StreamEvent.INITIAL, c, self._expected, f"Received (initial): {c}")
 
         if c <= self._reset_max_value and c < self._expected:
             self._expected = c + 1
-            return StreamDecision(
-                event=StreamEvent.RESET,
-                count=c,
-                expected_after=self._expected,
-                message=f"Detected counter reset. Re-syncing at: {c}",
-            )
+            return StreamDecision(StreamEvent.RESET, c, self._expected, f"Detected reset: {c}")
 
         if c < self._expected:
-            return StreamDecision(
-                event=StreamEvent.OUT_OF_ORDER,
-                count=c,
-                expected_after=self._expected,
-                message=f"Out-of-order/invalid: {c} < {self._expected}",
-            )
+            return StreamDecision(StreamEvent.OUT_OF_ORDER, c, self._expected, f"Out-of-order: {c} < {self._expected}")
 
         self._expected = c + 1
-        return StreamDecision(
-            event=StreamEvent.OK,
-            count=c,
-            expected_after=self._expected,
-            message=f"Received: {c}",
-        )
+        return StreamDecision(StreamEvent.OK, c, self._expected, f"Received: {c}")
