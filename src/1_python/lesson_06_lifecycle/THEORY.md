@@ -1,217 +1,122 @@
-# Lesson 05 (Python) – Parameters & Central Configuration
+# Lesson 06 (Python) – Lifecycle Management
 
 ## Goal
 
-Revisit the publisher–subscriber pair using **fully parameterised configuration**.
+Upgrade the previous Publisher/Subscriber nodes to be **Managed Lifecycle Nodes**.
 
 By the end of this lesson, the system:
+- Starts in an `Unconfigured` state (Silent).
+- Transitions through the standard **ROS 2 Lifecycle State Machine**:
+  - `Unconfigured` → `Inactive` (Resources created, paused)
+  - `Inactive` → `Active` (Data flows)
+  - `Active` → `Inactive` (Data paused)
+  - `*` → `Finalized` (Cleanup and exit)
+- Responds to standard administrative service calls (`/get_state`, `/change_state`).
 
-- Loads **topic names, QoS profiles, and behaviour** from central YAML files.
-- Applies configuration at startup via ROS parameters.
-- Safely updates supported parameters **at runtime** using callbacks.
-- Exposes its effective configuration through standard ROS inspection tools.
+This lesson establishes **Operational Maturity**: nodes that wait for orchestration rather than "starting and screaming" immediately.
 
-This lesson establishes configuration as a **system-level concern**, not something embedded in node code.
-
-> Assumes completion of Lessons 00–04.
+> Assumes completion of Lesson 05.
 
 ---
 
-## What’s New in Lesson 05
+## What’s New in Lesson 06
 
 Compared to earlier lessons:
-
-- **No hardcoded strings** for topics, QoS, or behaviour.
-- **Multiple parameter files** are composed at startup.
-- **Validation** happens before parameters take effect.
-- **Runtime updates** are applied without restarting the node.
-
-This is the point where “parameters exist” becomes “parameters are first-class”.
+- **No Automatic Start**: Nodes launch but do nothing until configured.
+- **State-Based Resources**: Topics and timers are created/destroyed dynamically based on the state.
+- **Manual Gating (Python)**: Explicit checks prevent data flow when the node is not `Active`.
+- **Integration Testing**: We verify the *process* of starting up, not just the logic.
 
 ---
 
-## Configuration Model
+## The Lifecycle State Machine
 
-Lesson 05 uses **three shared YAML files**:
+The **Single Source of Truth** for node behavior is the standard ROS 2 state machine:
 
-| File                   | Purpose                 |
-|------------------------|-------------------------|
-| `topics_config.yaml`   | Topic names             |
-| `qos_config.yaml`      | QoS profiles + defaults |
-| `services_config.yaml` | Service names           |
+| State | Definition | Permitted Actions |
+| :--- | :--- | :--- |
+| **Unconfigured** | The node object exists, but has no configuration. | Load parameters. |
+| **Inactive** | The node is configured (parameters loaded, topics advertised), but passive. | Inspect configuration. No publishing. |
+| **Active** | The node is fully operational. | Publish data, run control loops. |
+| **Finalized** | The node is destroyed. | None. |
 
-Each language consumes the same schema via its own thin utility layer.
-
-Composition happens explicitly at the command line (launch wiring comes later).
-
----
-
-## Build
-
-From the workspace root:
-
-```bash
-cd ~/ros2_ws_tutorial
-colcon build --packages-select utils_py lesson_05_parameters_py --symlink-install
-source install/setup.bash
-````
-
-If you are overriding an underlay-installed `utils_py`:
-
-```bash
-colcon build --packages-select utils_py --symlink-install --allow-overriding utils_py
-source install/setup.bash
-```
+### Transitions
+Transitions are triggered by external service calls (e.g., from a Manager Node or CLI).
+1. **Configure** (`Unconfigured` → `Inactive`): Allocates resources (topics, timers).
+2. **Activate** (`Inactive` → `Active`): Enables data flow (opens the gate).
+3. **Deactivate** (`Active` → `Inactive`): Disables data flow (closes the gate).
+4. **Cleanup** (`Inactive` → `Unconfigured`): Destroys resources (resets to fresh state).
 
 ---
 
-## Run Python unit tests (no ROS graph required)
+## Python Implementation Details (The Shim)
 
-```bash
-colcon test --packages-select lesson_05_parameters_py
-colcon test-result --verbose
-```
+Unlike C++, `rclpy` does not yet have a native `LifecycleNode` class. To achieve compliance, we use a custom **Shim** (`utils_py.LifecycleNode`).
 
----
+### 1. The Service Interface
+The Shim implements the standard services so external tools treat the Python node exactly like a native C++ node:
+* `~/get_state`
+* `~/change_state`
+* `~/get_available_transitions`
 
-## Run – Publisher
+### 2. Manual Gating
+In C++, the middleware automatically blocks publication when `Inactive`. In Python, we must implement **Software Gating**:
+* **Publishers**: We check `if self._is_enabled:` before publishing.
+* **Subscribers**: We check `if self._is_enabled:` inside the callback before processing data.
 
-Run the publisher with all three config files composed:
+### 3. The Threading Requirement
+Because the Lifecycle Shim relies on ROS Services to change state, the node must be able to process a "Configure" request even while it is doing other work.
+* **Problem**: `rclpy.spin()` is single-threaded by default. If the node blocks, the management services hang.
+* **Solution**: We use `rclpy.executors.MultiThreadedExecutor` and assign the lifecycle services to a `ReentrantCallbackGroup`.
 
-```bash
-ros2 run lesson_05_parameters_py lesson_05_publisher --ros-args \
-  --params-file src/4_interfaces/lesson_interfaces/config/topics_config.yaml \
-  --params-file src/4_interfaces/lesson_interfaces/config/qos_config.yaml \
-  --params-file src/4_interfaces/lesson_interfaces/config/services_config.yaml
-```
-
-**Expected behaviour:**
-
-* No default warnings if YAML is loaded correctly.
-* The node publishes `MsgCount` at the configured rate.
-* Topic and QoS match the YAML definitions.
-
----
-
-## Run – Subscriber
-
-In a second terminal:
-
-```bash
-ros2 run lesson_05_parameters_py lesson_05_subscriber --ros-args \
-  --params-file src/4_interfaces/lesson_interfaces/config/topics_config.yaml \
-  --params-file src/4_interfaces/lesson_interfaces/config/qos_config.yaml
-```
-
-The subscriber validates stream ordering and reacts to resets using parameters.
+### 4. Service Naming & Remapping
+To ensure the node works with **ROS 2 Remapping** (e.g., in integration tests), services are declared using relative names (`~/get_state`).
+* **Incorrect**: `f"{node_name}/get_state"` (Hardcodes the name, ignores remapping).
+* **Correct**: `"~/get_state"` (Expands to `/remapped_name/get_state`).
 
 ---
 
-## Inspect the Running System
+## Architecture
 
-### List parameters
+```text
+       +-----------------------+
+       |   Lifecycle Manager   |
+       |  (CLI or Test Script) |
+       +-----------+-----------+
+                   |
+          Service Calls (Standard)
+                   |
+       +-----------v-----------+
+       |   Managed Node (Py)   |
+       |                       |
+       |  +-----------------+  |
+       |  | Lifecycle Shim  |  | <--- Handles State Machine
+       |  +--------+--------+  |
+       |           |           |
+       |    +------v------+    |
+       |    |  User Logic |    | <--- Implements on_configure(), on_activate()
+       |    +-------------+    |
+       +-----------------------+
 
-```bash
-ros2 param list /lesson_05_publisher
-ros2 param list /lesson_05_subscriber
 ```
-
-### Inspect effective values
-
-```bash
-ros2 param get /lesson_05_publisher timer_period_s
-ros2 param get /lesson_05_subscriber reset_max_value
-```
-
-### Verify transport configuration
-
-```bash
-ros2 topic info -v /tutorial/telemetry
-```
-
-Confirm reliability/durability/depth match `qos_config.yaml` and both nodes appear.
-
----
-
-## Runtime Parameter Updates (Hot Reload)
-
-### Change publish rate (publisher)
-
-```bash
-ros2 param set /lesson_05_publisher timer_period_s 0.2
-```
-
-* Validation runs before application.
-* The timer is rebuilt safely.
-* Publishing rate changes immediately.
-
-### Adjust reset tolerance (subscriber)
-
-```bash
-ros2 param set /lesson_05_subscriber reset_max_value 5
-```
-
-* Listener behaviour updates in place.
-* No node restart required.
-
-Invalid values are rejected with clear reasons.
-
----
-
-## Common Pitfall: `\` line continuation
-
-When writing multi-line commands, the backslash must be the **final character** on the line.
-
-Bad (has a trailing space after `\`):
-
-```bash
---params-file .../topics_config.yaml \ 
---params-file ...
-```
-
-Good:
-
-```bash
---params-file .../topics_config.yaml \
---params-file ...
-```
-
-If the line continuation breaks, ROS won’t receive later `--params-file` arguments and you’ll see default warnings.
-
----
-
-## Architecture Notes
-
-* Central YAML is the startup source of truth.
-* ROS parameters are the live configuration.
-* Utilities only:
-
-  * read parameters
-  * apply defaults
-  * validate values
-* Nodes:
-
-  * declare parameters
-  * own ROS resources
-  * react to updates via callbacks
-
-No file watching, no custom loaders, and no launch files yet. Those are introduced later on purpose.
 
 ---
 
 ## What This Lesson Proves
 
-When Lesson 05 works correctly, you have demonstrated:
+When Lesson 06 works correctly, you have demonstrated:
 
-1. Cross-language configuration parity using shared YAML.
-2. Safe runtime mutation of node behaviour.
-3. Clear separation between configuration, logic, and ROS resources.
-4. A production-grade pattern that scales beyond tutorials.
+1. **Determinism**: You can launch 50 nodes and ensure they are all configured before a single message is sent.
+2. **Standard Compliance**: Your Python node behaves exactly like a system-level C++ component (e.g., Nav2).
+3. **Testability**: You can write integration tests that drive the node through its entire lifecycle programmatically.
 
 ---
 
 ## What Comes Next
 
-Lesson 06 introduces Lifecycle Nodes, where configuration and activation are no longer the same step.
+We will implement the exact same architecture in **C++** (Lesson 06 C++).
+Because C++ has native support (`rclcpp_lifecycle`), we will delete the Shim code and use the middleware's built-in gating, proving that the architecture persists even when the language changes.
 
-Lesson 09 revisits this to wire the same YAML files automatically via launch/config discovery—without changing node code.
+```
+
+```

@@ -170,13 +170,19 @@ def main(args: Optional[List[str]] = None) -> None:
     rclpy.init(args=args)
     node = LifecycleSubscriberNode()
     
+    # Use a MultiThreadedExecutor to prevent deadlocks during 
+    # service-based state transitions
+    executor = rclpy.executors.MultiThreadedExecutor()
+    executor.add_node(node)
+    
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     except Exception as exc:
         node.get_logger().error(f"Unhandled exception: {exc}")
     finally:
+        executor.shutdown()
         node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()

@@ -213,6 +213,7 @@ def main(args: Optional[List[str]] = None) -> None:
     except Exception as exc:
         node.get_logger().error(f"Unhandled exception: {exc}")
     finally:
+        executor.shutdown()
         node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()
