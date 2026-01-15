@@ -35,7 +35,7 @@ source install/setup.bash
 Terminal 1:
 
 ```bash
-ros2 run lesson_03_subscriber_rclrs lesson_03_node
+ros2 run lesson_03_subscriber_rclrs lesson_03_subscriber_rclrs
 ```
 
 **Expected output (idle):**
