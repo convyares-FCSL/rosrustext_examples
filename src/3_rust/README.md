@@ -57,6 +57,7 @@ Core ROS packages such as:
 
 * `rcl_interfaces`
 * `builtin_interfaces`
+* `lifecycle_msgs`
 * `service_msgs`
 * `action_msgs`
 * `unique_identifier_msgs`

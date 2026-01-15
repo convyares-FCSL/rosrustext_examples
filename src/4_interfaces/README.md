@@ -20,6 +20,7 @@ It exists to make interface usage **consistent, deterministic, and cross-languag
 │   └── README.md
 │
 ├── rcl_interfaces/           # Core ROS 2 interfaces (overlay)
+├── lifecycle_msgs/           # Core ROS 2 interfaces (overlay)
 ├── unique_identifier_msgs/   # Core ROS 2 interfaces (overlay)
 │
 ├── rosidl_rust/              # rosidl_generator_rs (Rust interface generator)
@@ -54,7 +55,7 @@ This ensures Cargo resolves interfaces from the workspace, not crates.io.
 
 ---
 
-### `rcl_interfaces` and `unique_identifier_msgs` (Overlays)
+### `rcl_interfaces`, `lifecycle_msgs` and `unique_identifier_msgs` (Overlays)
 
 These are **local clones of core ROS 2 interface packages**.
 

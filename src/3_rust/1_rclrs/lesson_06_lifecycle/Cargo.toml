@@ -5,11 +5,11 @@ edition = "2021"
 
 [dependencies]
 # ROS 2 Client Library
-rclrs = { git = "https://github.com/ros2-rust/ros2_rust", tag = "v0.6.0" }
+rclrs = "0.6.0"
 
 # Lifecycle Adapter (Published)
 # We enable "bond" and "transition_graph" to match standard ROS 2 lifecycle node behavior
-rosrustext_rosrs = { version = "0.2", features = ["ROS", "bond", "transition_graph"] }
+rosrustext_rosrs = { version = "0.2", features = ["ros2", "bond", "transition_graph"] }
 
 # Utilities
 anyhow = "1.0"
