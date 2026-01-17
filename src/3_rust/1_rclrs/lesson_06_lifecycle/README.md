@@ -2,250 +2,253 @@
 
 ## Goal
 
-Upgrade the parameterised nodes from Lesson 05 to fully managed **Lifecycle Nodes**.
+Convert the Publisher and Subscriber nodes from Lesson 05 into **Managed Lifecycle Nodes**.
 
-By the end of this lesson, the system:
+The resulting system:
 
-* Starts in an **Unconfigured** state (no resources allocated).
-* Allocates resources (timers, publishers, logic) only during the **Configure** transition.
-* Enables data flow only during the **Activate** transition.
-* Reacts to parameter changes using the modern **ParameterWatcher** (v0.2.0) pattern.
-* Cleans up deterministically during **Cleanup** or **Shutdown**.
-
-This lesson establishes nodes as **managed components** rather than always-on scripts.
+* Starts in an `Unconfigured` state with no runtime resources allocated.
+* Transitions through the standard ROS 2 lifecycle states:
+  `Unconfigured` → `Inactive` → `Active`.
+* Processes data only while in the `Active` state.
+* Supports deterministic shutdown and reset using standard ROS 2 lifecycle commands.
 
 > Assumes completion of Lessons 00–05.
 
 ---
 
-## What’s New in Lesson 06
+## Build (Terminal 1)
 
-Compared to earlier lessons:
-
-* **State Machine**: Nodes have distinct states (`Unconfigured`, `Inactive`, `Active`, `Finalized`).
-* **Deterministic Startup**: Launch order no longer dictates initialization order; an external manager controls when nodes configure.
-* **Gated Execution**:
-* Publishers/Timers are created "gated" (silent unless Active).
-* Subscriptions are created "gated" (drop messages unless Active).
-
-
-* **`rosrustext` Integration**: Uses `rosrustext_rosrs` v0.2.0 to provide the lifecycle state machine and parameter event stack missing from vanilla `rclrs`.
-
----
-
-## Architecture Overview
-
-Lesson 06 splits responsibilities to support the lifecycle state machine:
-
-* **Pure Logic (unchanged)**
-Implemented in `lib.rs`, tested independently.
-* **Lifecycle Node (The Manager)**
-The `Lesson06PublisherNode` struct implements `LifecycleCallbacksWithNode`:
-* **`on_configure`**: Allocates the `PublisherComponent`, declares parameters, creates the `ManagedTimer`, and starts the `ParameterWatcher`.
-* **`on_activate`**: Enables the data plane (transport).
-* **`on_cleanup`**: Drops all handles (stops timers, frees DDS resources).
-
-
-* **Passive Resources**
-The `PublisherComponent` and `SubscriberComponent` are passive. They are allocated when needed and hold the business logic, but they do not control their own execution.
-
----
-
-## Build
-
-From the workspace root:
+**Role:** This terminal is used for **building** and issuing **lifecycle commands**.
 
 ```bash
 cd ~/ros2_ws_tutorial
 colcon build --packages-select utils_rclrs lesson_interfaces
 colcon build --packages-select lesson_06_lifecycle_rclrs
 source install/setup.bash
-
 ```
 
-*Note: Ensure `rosrustext_rosrs` is present in your workspace or dependencies.*
+> Ensure `rosrustext_rosrs` is available in the workspace or as a dependency.
 
 ---
 
-## Verify: Unit Testing
+## Run – Lifecycle Publisher (Terminal 2)
 
-Logic remains independent of the lifecycle wrapper, so tests still pass:
-
-```bash
-cd ~/ros2_ws_tutorial/src/3_rust/1_rclrs/lesson_06_lifecycle
-cargo test
-
-```
-
----
-
-## Run – Lifecycle Publisher
-
-Run the publisher. Unlike previous lessons, it will start **silent**:
+**Role:** This terminal runs the **Publisher** node.
 
 ```bash
 cd ~/ros2_ws_tutorial
 source install/setup.bash
+
 ros2 run lesson_06_lifecycle_rclrs lesson_06_lifecycle_publisher --ros-args \
   --params-file src/4_interfaces/lesson_interfaces/config/topics_config.yaml \
   --params-file src/4_interfaces/lesson_interfaces/config/qos_config.yaml
-
 ```
 
 **Observation:**
-The terminal will show:
-`[INFO] ...: Node initialized (State: Unconfigured). Waiting for manager...`
-
-It is **not** publishing yet. It hasn't even created the timer or declared parameters.
+The node starts and logs that it is waiting in the `Unconfigured` state.
+No parameters are declared and no timers or publishers are created.
 
 ---
 
-## Run – Lifecycle Subscriber
+## Run – Lifecycle Subscriber (Terminal 3)
 
-In a second terminal:
+**Role:** This terminal runs the **Subscriber** node.
 
 ```bash
 cd ~/ros2_ws_tutorial
 source install/setup.bash
+
 ros2 run lesson_06_lifecycle_rclrs lesson_06_lifecycle_subscriber --ros-args \
   --params-file src/4_interfaces/lesson_interfaces/config/topics_config.yaml \
   --params-file src/4_interfaces/lesson_interfaces/config/qos_config.yaml
-
 ```
 
 **Observation:**
-Also starts silent. `Unconfigured`.
+The subscriber also remains idle in the `Unconfigured` state.
 
 ---
 
-## Operate the Lifecycle (Manual Management)
+## Orchestrating the System (Back to Terminal 1)
 
-We will use the CLI to drive the state machine manually.
+Lifecycle transitions are driven manually using the ROS 2 CLI.
 
-### 1. Check Status
-
-In a third terminal:
+### 1. Check Initial State
 
 ```bash
 ros2 lifecycle get /lesson_06_lifecycle_publisher
 ros2 lifecycle get /lesson_06_lifecycle_subscriber
-
 ```
 
-*Output: `unconfigured*`
+Expected output for both:
 
-### 2. Configure (Allocate Resources)
+```
+unconfigured
+```
 
-Trigger resource creation (parameters declared, timers created).
+---
+
+### 2. Configure Both Nodes (Allocate Resources)
+
+This transition declares parameters, creates topics, and allocates internal resources, but does not enable data flow.
 
 ```bash
 ros2 lifecycle set /lesson_06_lifecycle_publisher configure
 ros2 lifecycle set /lesson_06_lifecycle_subscriber configure
-
 ```
-
-*Output: `Transitioning: Unconfigured -> Inactive*`
-
-**Status:** Nodes are now **Inactive**.
-
-* Parameters exist and can be set.
-* Topics exist.
-* **BUT:** No data flows. The timers are gated.
-
-### 3. Activate (Enable Data Flow)
-
-Enable the transport layer.
-
-```bash
-ros2 lifecycle set /lesson_06_lifecycle_subscriber activate
-ros2 lifecycle set /lesson_06_lifecycle_publisher activate
-
-```
-
-*Output: `Transitioning: Inactive -> Active*`
 
 **Observation:**
 
-* The publisher starts logging "Stream initialized".
-* The subscriber starts receiving data.
-* Data flow is now live.
+* Nodes transition to `Inactive`.
+* Parameters exist and can be modified.
+* Publishers, subscriptions, timers, and watchers are created.
+* Data-plane execution remains gated.
 
-### 4. Deactivate (Pause)
+---
 
-Pause execution without destroying resources.
+### 3. Activate Subscriber First
+
+Activating the subscriber first ensures it is ready before data production begins.
+
+```bash
+ros2 lifecycle set /lesson_06_lifecycle_subscriber activate
+```
+
+**Observation:**
+The subscriber transitions to `Active` but receives no data yet.
+
+---
+
+### 4. Activate Publisher
+
+```bash
+ros2 lifecycle set /lesson_06_lifecycle_publisher activate
+```
+
+**Observation:**
+
+* The publisher begins producing messages.
+* The subscriber receives the first sample immediately (starting at count `0`).
+* No messages are lost during startup.
+
+---
+
+### 5. Deactivate (Pause Execution)
 
 ```bash
 ros2 lifecycle set /lesson_06_lifecycle_publisher deactivate
-
 ```
 
-**Observation:** Publishing stops immediately. The node is dormant but still configured.
+**Observation:**
+Publishing stops immediately.
+Resources remain allocated, and the node stays in the `Inactive` state.
 
-### 5. Cleanup (Destroy Resources)
+---
 
-Return to fresh state.
+### 6. Cleanup (Release Resources)
 
 ```bash
 ros2 lifecycle set /lesson_06_lifecycle_publisher cleanup
-
 ```
 
-**Observation:** All handles (timers, watchers, components) are dropped. The node is back to `Unconfigured`.
+**Observation:**
+
+* Timers, publishers, parameter watchers, and internal components are dropped.
+* The node returns to the `Unconfigured` state.
+* No background activity remains.
 
 ---
 
 ## Runtime Parameter Updates
 
-Parameters can be updated while the node is **Configured** (Inactive or Active).
+Parameters can be modified while the node is `Inactive` or `Active`.
 
-1. Ensure the publisher is **Active**.
-2. Change the rate:
+### Example: Change Publish Rate
 
 ```bash
 ros2 param set /lesson_06_lifecycle_publisher timer_period_s 0.2
-
 ```
 
-**Observation:**
+**Behavior:**
 
-* The `ParameterWatcher` catches the event.
-* The logic validates the value (> 0).
-* The `ManagedTimer` is hot-swapped safely.
-* The publish rate increases immediately.
+* The `ParameterWatcher` receives the update.
+* The value is validated.
+* The existing timer is replaced with a new gated timer.
+* The updated rate takes effect immediately if the node is `Active`.
 
-**Try invalid values:**
+### Invalid Values
 
 ```bash
 ros2 param set /lesson_06_lifecycle_publisher timer_period_s -1.0
-
 ```
 
-* The update is logged as ignored (warn), and the node continues running safely.
+**Behavior:**
+The update is rejected and logged.
+The existing configuration remains unchanged.
 
 ---
+
+## Automated Testing
+
+### 1. Unit Tests (Logic Verification)
+Verifies the business logic (validators, math) without loading the ROS middleware.
+
+```bash
+cd ~/ros2_ws_tutorial/src/3_rust/1_rclrs/lesson_06_lifecycle
+cargo test
+# OR
+colcon test --packages-select lesson_06_lifecycle_rclrs --event-handlers console_direct+
+```
+
+### 2. Integration Tests (System Verification)
+Verifies the node's state machine by treating the compiled binary as a black box.
+
+```bash
+cd ~/ros2_ws_tutorial
+source install/setup.bash
+launch_test src/3_rust/1_rclrs/lesson_06_lifecycle/test/test_integration.py
+```
+
+<details>
+<summary><strong>Advanced: Run Stress Test (5x Loop)</strong></summary>
+
+To verify reliability and ensure no race conditions exist during transitions, you can run the test suite in a loop:
+
+```bash
+for i in {1..5}; do
+   echo "--- Run #$i ---"
+   launch_test src/3_rust/1_rclrs/lesson_06_lifecycle/test/test_integration.py || break
+done
+```
+
+</details>
+
+---
+
+
 
 ## Architecture Notes
 
-* **Unconfigured**: Zero footprint. No timers, no subscribers, no parameters declared.
-* **Configured (Inactive)**: Resources exist but are gated. Used for "warm standby".
-* **Active**: Running.
-* **Cleanup**: Crucial for avoiding resource leaks. We explicitly drop `Arc` handles to release the underlying DDS entities.
-* **ParameterWatcher**:
-* Created in `on_configure`.
-* Dropped in `on_cleanup`.
-* This ensures we don't process parameter events when the node is supposed to be unconfigured.
+* **Lifecycle Implementation**
+  Lifecycle behavior is implemented using `rosrustext_rosrs`, providing a state machine and parameter event handling absent from core `rclrs`.
 
+* **Publisher Gating**
+  Timers and publishers are created as *gated resources*. Execution occurs only while the node is `Active`.
 
+* **Subscriber Gating**
+  Subscriptions are created as gated subscriptions and drop incoming samples while inactive.
 
----
+* **Resource Ownership**
+  All runtime resources are allocated during `on_configure` and released during `on_cleanup` or `on_shutdown`.
 
-## What This Lesson Proves
-
-When Lesson 06 works correctly, you have demonstrated:
-
-1. **Managed Startup**: Nodes do not run until explicitly told to.
-2. **Resource Hygiene**: Resources are allocated and freed deterministically.
-3. **Gated Execution**: Logic runs only when the state machine permits.
-4. **Modern Parity**: Implementing standard ROS 2 lifecycle behavior in Rust using `rosrustext`.
+* **ParameterWatcher Lifetime**
+  Parameter watchers are created during `on_configure` and dropped during cleanup to prevent handling updates while unconfigured.
 
 ---
+
+## Resulting System Properties
+
+* Nodes do not allocate runtime resources until explicitly configured.
+* Data-plane execution occurs only while nodes are in the `Active` state.
+* Startup order is deterministic and controlled via lifecycle transitions.
+* Resources are released deterministically during cleanup and shutdown.
+* Runtime reconfiguration is handled safely without restarting nodes.

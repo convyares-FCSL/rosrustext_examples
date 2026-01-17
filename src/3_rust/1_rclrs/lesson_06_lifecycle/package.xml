@@ -12,6 +12,8 @@
   <depend>utils_rclrs</depend>
   <depend>lesson_interfaces</depend>
   <depend>lifecycle_msgs</depend>
+  <depend>rosrustext_interfaces</depend>
+  <depend>rosrustext_msgs</depend>
 
   <export>
     <build_type>ament_cargo</build_type>

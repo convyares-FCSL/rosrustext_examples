@@ -6,12 +6,12 @@ Revisit the publisher–subscriber pair using **fully parameterised configuratio
 
 By the end of this lesson, the system:
 
-* Loads **topic names, QoS profiles, and behaviour** from central YAML files.
-* Applies configuration at startup via ROS parameters.
-* Safely updates supported parameters **at runtime** using callbacks.
-* Exposes its effective configuration through standard ROS inspection tools.
+* Loads **topic names, QoS profiles, and behaviour** from central YAML files (via ROS parameters).
+* Applies configuration at startup using declared parameter defaults + YAML overrides.
+* Applies supported parameter updates **at runtime** using `ParameterWatcher` callbacks.
+* Exposes effective configuration using standard ROS 2 inspection tools.
 
-This lesson establishes configuration as a **system-level concern**, not something embedded in node code.
+This lesson treats configuration as a **system-level contract**, not node-local code.
 
 > Assumes completion of Lessons 00–04.
 
@@ -21,54 +21,47 @@ This lesson establishes configuration as a **system-level concern**, not somethi
 
 Compared to earlier lessons:
 
-* **No hardcoded strings** for topics, QoS, or behaviour.
-* **Multiple parameter files** are composed at startup.
-* **Validation** happens before parameters take effect.
-* **Runtime updates** are applied without restarting the node.
-
-This is the point where “parameters exist” becomes “parameters are first-class”.
+* No hardcoded strings for topics or QoS.
+* Multiple parameter files are composed at startup.
+* Behavioural parameters are validated before being applied.
+* Runtime updates are applied without restarting the process.
 
 ---
 
 ## Architecture Overview (rclrs)
 
-Lesson 05 deliberately splits responsibilities:
+Lesson 05 splits responsibilities:
 
-* **Pure Logic (no ROS)**
-  Implemented in `lib.rs`:
+### Pure Logic (no ROS)
+Implemented in `lib.rs`:
 
-  * `TelemetryPublisherCore`
-  * `TelemetryStreamValidator`
+* `TelemetryPublisherCore`
+* `TelemetryStreamValidator`
 
-* **ROS Middleware (rclrs nodes)**
+These are unit-testable without ROS 2.
 
-  * Publisher:
+### Middleware Adapters (ROS nodes)
+Implemented in `src/bin/*.rs`:
 
-    * Owns publisher resource and logic
-    * Rebuilds timer on parameter updates
-  * Subscriber:
-
-    * Owns subscription resource
-    * Mutates validation behaviour in-place on parameter updates
-
-This allows logic to be tested independently using `cargo test`, while ROS nodes focus on wiring and lifecycle.
+* Publisher:
+  * Owns publisher resource and core logic
+  * Rebuilds the publish timer when `timer_period_s` changes
+* Subscriber:
+  * Owns subscription resource
+  * Updates validator behaviour in-place when `reset_max_value` changes
 
 ---
 
 ## Configuration Model
 
-Lesson 05 uses **three shared YAML files**:
+Lesson 05 uses shared YAML files:
 
-| File                   | Purpose                 |
-| ---------------------- | ----------------------- |
-| `topics_config.yaml`   | Topic names             |
-| `qos_config.yaml`      | QoS profiles + defaults |
-| `services_config.yaml` | Service names           |
+| File                 | Purpose                 |
+| -------------------- | ----------------------- |
+| `topics_config.yaml` | Topic names             |
+| `qos_config.yaml`    | QoS profiles + defaults |
 
-Each language consumes the same schema via its own thin utility layer (`utils_rclrs` here).
-
-Composition happens explicitly at the command line.
-Launch files and discovery logic are introduced later on purpose.
+YAML is applied by ROS 2 before node startup. Each node declares the parameters it expects and reads the effective values (default or overridden).
 
 ---
 
@@ -81,7 +74,7 @@ cd ~/ros2_ws_tutorial
 colcon build --packages-select utils_rclrs lesson_interfaces
 colcon build --packages-select lesson_05_parameters_rclrs
 source install/setup.bash
-```
+````
 
 If colcon warns about overriding packages from an underlay:
 
@@ -93,35 +86,31 @@ colcon build --packages-select utils_rclrs lesson_interfaces --allow-overriding 
 
 ## Verify: Unit Testing (Logic Only)
 
-Because the business logic lives in `src/lib.rs`, it can be tested without ROS:
+The business logic is middleware-free, so it can be tested without ROS:
 
 ```bash
 cd ~/ros2_ws_tutorial/src/3_rust/1_rclrs/lesson_05_parameters
 cargo test
 ```
 
-Expected: all stream and publisher logic tests pass.
+Expected: logic tests pass (stream behaviour + time conversion).
 
 ---
 
 ## Run – Publisher
-
-Run the publisher with all three config files composed:
 
 ```bash
 cd ~/ros2_ws_tutorial
 source install/setup.bash
 ros2 run lesson_05_parameters_rclrs lesson_05_publisher --ros-args \
   --params-file src/4_interfaces/lesson_interfaces/config/topics_config.yaml \
-  --params-file src/4_interfaces/lesson_interfaces/config/qos_config.yaml \
-  --params-file src/4_interfaces/lesson_interfaces/config/services_config.yaml
+  --params-file src/4_interfaces/lesson_interfaces/config/qos_config.yaml
 ```
 
-**Expected behaviour:**
+Expected behaviour:
 
-* No default warnings if YAML is loaded correctly.
-* The node publishes `MsgCount` at the configured rate (1.0 Hz).
-* Topic and QoS match the YAML definitions (`/tutorial/telemetry`).
+* The node publishes `MsgCount` on the configured telemetry topic.
+* The publish period defaults to `timer_period_s = 1.0` unless overridden.
 
 ---
 
@@ -137,37 +126,38 @@ ros2 run lesson_05_parameters_rclrs lesson_05_subscriber --ros-args \
   --params-file src/4_interfaces/lesson_interfaces/config/qos_config.yaml
 ```
 
-The subscriber validates stream ordering and reacts to resets using parameters.
+Expected behaviour:
+
+* The subscriber logs stream validation decisions.
+* The reset tolerance defaults to `reset_max_value = 1` unless overridden.
 
 ---
 
 ## Inspect the Running System
 
-### List parameters
+List parameters:
 
 ```bash
 ros2 param list /lesson_05_publisher
 ros2 param list /lesson_05_subscriber
 ```
 
-### Inspect effective values
+Read effective values:
 
 ```bash
 ros2 param get /lesson_05_publisher timer_period_s
 ros2 param get /lesson_05_subscriber reset_max_value
 ```
 
-### Verify transport configuration
+Inspect transport configuration:
 
 ```bash
 ros2 topic info -v /tutorial/telemetry
 ```
 
-Confirm reliability, durability, and depth match `qos_config.yaml`, and both nodes appear.
-
 ---
 
-## Runtime Parameter Updates (Hot Reload)
+## Runtime Parameter Updates
 
 ### Change publish rate (Publisher)
 
@@ -175,9 +165,17 @@ Confirm reliability, durability, and depth match `qos_config.yaml`, and both nod
 ros2 param set /lesson_05_publisher timer_period_s 0.2
 ```
 
-* Validation runs before application.
-* The timer resource is rebuilt safely.
-* Publishing rate changes immediately.
+Expected behaviour:
+
+* The update is validated.
+* The publish timer is rebuilt with the new period.
+* The publish rate changes immediately.
+
+Invalid values are ignored:
+
+```bash
+ros2 param set /lesson_05_publisher timer_period_s -1.0
+```
 
 ### Adjust reset tolerance (Subscriber)
 
@@ -185,75 +183,21 @@ ros2 param set /lesson_05_publisher timer_period_s 0.2
 ros2 param set /lesson_05_subscriber reset_max_value 5
 ```
 
-* Validation logic updates in place.
-* Subscription resource is not rebuilt.
-* No node restart required.
+Expected behaviour:
 
-**Try invalid values:**
+* The update is validated.
+* The validator threshold is updated in-place.
+* Subsequent messages use the new threshold immediately.
 
-```bash
-ros2 param set /lesson_05_publisher timer_period_s -1.0
-```
-
-The request is rejected with a clear reason.
-
----
-
-## Common Pitfall: `\` Line Continuation
-
-When writing multi-line commands, the backslash must be the **final character** on the line.
-
-Bad (trailing space after `\`):
+Invalid values are ignored:
 
 ```bash
---params-file .../topics_config.yaml \ 
---params-file ...
+ros2 param set /lesson_05_subscriber reset_max_value -1
 ```
 
-Good:
-
-```bash
---params-file .../topics_config.yaml \
---params-file ...
-```
-
-If the line continuation breaks, ROS won’t receive later `--params-file` arguments and you’ll see default warnings from `utils_rclrs`.
-
 ---
 
-## Architecture Notes
+## Notes
 
-* **Central YAML** is the startup source of truth.
-
-* **ROS parameters** are the live configuration.
-
-* **Utilities** (`utils_rclrs`) only:
-
-  * read parameters
-  * apply defaults
-  * warn on missing config
-
-* **Nodes**:
-
-  * declare parameters
-  * own ROS resources
-  * react to updates via callbacks
-
-No file watching, no custom loaders, and no launch files yet. Those are introduced later on purpose.
-
----
-
-## What This Lesson Proves
-
-When Lesson 05 works correctly, you have demonstrated:
-
-1. Cross-language configuration parity using shared YAML.
-2. Safe runtime mutation of node behaviour (two different strategies).
-3. Clear separation between configuration, logic, and ROS resources.
-4. A production-grade pattern suitable for real systems.
-
----
-
-## What Comes Next
-
-Lesson 06 introduces **Lifecycle Nodes**, where configuration and activation are no longer the same step.
+* `utils_rclrs` provides centralised access to topic names and QoS profiles via parameters.
+* Nodes declare their own behavioural parameters (`timer_period_s`, `reset_max_value`) and apply validated updates via `ParameterWatcher`.

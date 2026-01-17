@@ -2,34 +2,15 @@
 
 ## Architectural Intent
 
-In earlier lessons, node behaviour was hardcoded (publish rate, topic names, QoS).
+Earlier lessons hardcoded runtime behaviour (topic names, QoS, publish rate).
 
-In Lesson 05, configuration becomes a **first-class system contract**.
+Lesson 05 makes configuration a **system contract** that can be:
 
-The goal is to demonstrate that, even with an evolving Rust client library (`rclrs`), we can:
+* supplied centrally (YAML → ROS parameters)
+* inspected at runtime (ROS tooling)
+* updated safely while the process runs
 
-1. **Load configuration centrally from YAML at startup**
-2. **Inspect and modify behaviour at runtime using ROS parameters**
-3. **Keep business logic isolated from middleware concerns**
-4. **Apply updates safely without restarting the process**
-
-This lesson mirrors the C++ (`rclcpp`) architecture as closely as the current Rust ecosystem allows.
-
----
-
-## Core Concepts Introduced
-
-Lesson 05 introduces three production-grade patterns:
-
-1. **Configuration-First Design**
-   Topic names, QoS, and behavioural parameters are no longer hardcoded.
-   They are defined in shared YAML files and consumed uniformly across nodes.
-
-2. **Hot Updates via a Control Plane**
-   Runtime configuration changes are applied while the node is running.
-
-3. **Logic / Transport Separation**
-   Validation and sequencing logic lives in pure Rust, independent of ROS 2.
+The design goal is not “parameters exist”, but “parameters control behaviour in a disciplined way”.
 
 ---
 
@@ -37,238 +18,118 @@ Lesson 05 introduces three production-grade patterns:
 
 ```text
 3_rust/
- ├── utils_rclrs                (Shared Configuration Adapter)
+ ├── utils_rclrs                (Shared configuration adapter)
  └── lesson_05_parameters
-     ├── lib.rs                 (Pure Business Logic)
-     └── bin/*.rs               (Middleware Adapters)
-```
+     ├── src/lib.rs             (Pure business logic)
+     └── src/bin/*.rs           (ROS adapters: publisher + subscriber)
+````
 
-Each layer has a single responsibility.
+This separation is deliberate:
+
+* `lib.rs` answers “what should we do?”
+* `bin/*.rs` answers “how do we wire it into ROS 2 safely?”
 
 ---
 
-## 1. Pure Logic: `lib.rs` (No ROS Dependencies)
+## 1. YAML and ROS Parameters: What Actually Happens
 
-As in the C++ lesson, **all business logic is middleware-free**.
+A frequent misunderstanding is that the node “loads YAML”.
 
-```rust
-// Pure Rust logic, testable without ROS
-pub struct TelemetryStreamValidator {
-    expected: i64,
-    reset_max_value: i64,
-}
+It does not.
 
-impl TelemetryStreamValidator {
-    pub fn on_count(&mut self, count: i64) -> StreamDecision {
-        // validation logic
-    }
-}
-```
+The ROS 2 launch/runtime applies YAML files **before node construction**. When the node starts:
 
-Key properties:
+1. Parameters may already have override values (from YAML or CLI).
+2. The node declares parameters (types + defaults).
+3. The effective value is the merged result (override if provided, default otherwise).
 
-* No `rclrs` imports
-* No threading or timers
-* Deterministic and unit-testable
-* Mirrors `logic.hpp` in the C++ version
-
-This guarantees correctness *before* integration with ROS.
+In this lesson, the configuration contract is “declared + read”, not “file loaded”.
 
 ---
 
 ## 2. Shared Configuration Adapter: `utils_rclrs`
 
-utils_rclrs lives outside individual lessons and is shared across all Rust examples, enforcing a single workspace-wide configuration standard, exactly like utils_cpp in the C++ track.
-
-Just like `utils_cpp`, the Rust `utils_rclrs` crate centralises system knowledge:
+`utils_rclrs` centralises system-level configuration, so topic and QoS selection is consistent across nodes:
 
 ```rust
-let topic = topics::telemetry(&node);
-let qos   = qos::telemetry(&node);
+let topic = topics::telemetry(node);
+let qos   = qos::telemetry(node);
 ```
 
-### What `utils_rclrs` Actually Does (Important)
-
-`utils_rclrs` **does not load YAML**.
-
-Instead:
-
-1. YAML files are loaded by ROS **before** the node starts
-2. `declare_parameter` registers the parameter with the node
-3. `MandatoryParameter<T>` provides typed access to the effective value
-4. If no override exists, the declared default is used
-
-This matches C++ behaviour exactly.
-
-```rust
-pub fn declare_parameter<T>(
-    node: &Node,
-    name: &str,
-    default_value: T,
-) -> Result<MandatoryParameter<T>, DeclarationError>
-where
-    T: ParameterVariant + Clone + 'static,
-{
-    node.declare_parameter(name)
-        .default(default_value)
-        .mandatory()
-}
-```
-
-Across the entire Rust workspace, the adapter guarantees:
-
-* One canonical parameter name
-* One canonical type
-* Identical resolution across publisher and subscriber
+This mirrors the intent of `utils_cpp`: configuration knowledge lives in one place, and nodes consume it consistently.
 
 ---
 
-## 3. Middleware Adapter: The Node (Rust / rclrs)
+## 3. Runtime Updates: ParameterWatcher (No Polling)
 
-The node owns:
+Lesson 05 uses `rosrustext_rosrs::ParameterWatcher` to receive parameter change events and apply updates immediately.
 
-* ROS resources (publishers, subscriptions, timers)
-* The logic object
-* The configuration handles
+The nodes subscribe to changes for specific parameters:
 
-It acts as the **adapter** between ROS parameters and pure logic.
+* publisher watches `timer_period_s`
+* subscriber watches `reset_max_value`
 
----
+The callback path performs:
 
-## 4. Runtime Updates: The “Hotfix” Control Plane
+1. name/type filtering
+2. semantic validation
+3. no-op detection (ignore unchanged values)
+4. application of the new configuration
 
-### Why Polling Exists in Rust
-
-As of `rclrs v0.6.x`, there is **no equivalent** to:
-
-```cpp
-add_on_set_parameters_callback(...)
-```
-
-Rather than hiding this limitation, Lesson 05 makes it explicit and uses a **Control Plane / Data Plane split**.
+This matches the operational behaviour expected from other ROS 2 client libraries: parameter updates take effect without process restart.
 
 ---
 
-### Control Plane vs Data Plane
+## 4. Two Update Strategies (Why They Differ)
 
-```rust
-// Data Plane (High frequency, deterministic)
-fn on_tick(&self) {
-    // publish data
-}
+### Strategy A: Rebuild-on-Update (Publisher Timer)
 
-// Control Plane (Low frequency, ~1 Hz)
-fn check_parameters(&self) {
-    let current = period_param.get();
-    if current != last {
-        // apply update
-    }
-}
-```
+Changing `timer_period_s` affects a scheduling resource (a timer). Rather than attempting to mutate an active timer, the publisher:
 
-Key properties:
+1. validates the new value
+2. creates a new timer with the updated period
+3. swaps it into stored state
+4. drops the old timer by replacing the handle
 
-* Configuration polling is **low priority**
-* Publishing logic is **never blocked**
-* Behaviour matches callback semantics in practice
+This produces clean behaviour:
 
-This mirrors the intent of the C++ callback, even if the mechanism differs.
+* no partial updates
+* no timebase ambiguity
+* no resource leaks if the swap fails
 
----
+### Strategy B: In-Place Mutation (Subscriber Validator)
 
-## 5. Update Strategy 1: Rebuild-on-Update (Publisher)
+Changing `reset_max_value` affects only validation thresholds. The subscriber:
 
-**Use case:** Changing infrastructure resources (timers).
+1. validates the new value
+2. locks the validator
+3. updates a single field (`reset_max_value`)
+4. releases the lock
 
-In Rust, as in C++, we do **not** mutate a running timer.
-
-Instead:
-
-1. Validate the new value (pure logic)
-2. Construct a new `rclrs::Timer`
-3. Swap it into a `Mutex<Option<Timer>>`
-4. Drop the old timer safely
-
-```rust
-fn on_param_change(new_period_ms: u64) {
-    create_or_update_timer(new_period_ms);
-}
-```
-
-This guarantees:
-
-* No partial state
-* No undefined timing behaviour
-* No race conditions
-
-This is the same strategy as the C++ `create_or_update_timer`.
+The subscription itself is unchanged, and the next message is evaluated using the new setting immediately.
 
 ---
 
-## 6. Update Strategy 2: In-Place Mutation (Subscriber)
+## 5. Logic / Transport Separation
 
-**Use case:** Logic thresholds (`reset_max_value`).
+The stream validation and message production are pure Rust types in `lib.rs`.
 
-Here we mutate only the logic state:
+Key outcomes:
 
-```rust
-let mut v = validator.lock().unwrap();
-v.set_reset_max_value(new_value);
-```
+* no ROS imports in logic
+* deterministic, testable behaviour
+* ROS-specific concerns live only in the node adapter layer
 
-Why this is safe:
-
-* The subscription remains unchanged
-* Only a single integer is updated
-* The next message uses the new value immediately
-
-This mirrors the C++ approach of updating the validator without rebuilding the subscription.
+This is what enables meaningful unit tests (`cargo test`) independent of ROS graph state.
 
 ---
 
-## Memory & Ownership Model (Rust Perspective)
+## Summary
 
-Rust enforces ownership at compile time:
+Lesson 05 establishes a configuration architecture with three distinct roles:
 
-* `Arc<Mutex<T>>` replaces `std::unique_ptr`
-* Explicit locking replaces implicit thread safety
-* Lifetimes are enforced by the type system
+* **YAML + ROS parameters** define system configuration inputs.
+* **Nodes** declare, read, validate, and apply configuration changes.
+* **Logic** remains pure and testable.
 
-While more verbose, this eliminates entire classes of runtime errors.
-
----
-
-## Testing Strategy
-
-Because logic is isolated:
-
-```bash
-cargo test
-```
-
-Unit tests validate:
-
-* Stream ordering
-* Reset detection
-* Period quantisation
-
-No ROS graph is required, just like in the C++ lesson.
-
----
-
-## Why This Lesson Matters
-
-Lesson 05 demonstrates **professional-grade systems engineering in Rust**:
-
-* Configuration is external and inspectable
-* Logic is deterministic and testable
-* Runtime updates are safe and controlled
-* Middleware limitations are handled explicitly, not hidden
-
-This architecture scales directly to:
-
-* Larger systems
-* Multiple nodes
-* Mixed Rust / C++ deployments
-
-It establishes a **shared mental model** across languages, not just shared YAML files.
+This is the base pattern that Lesson 06 later extends with lifecycle state management.

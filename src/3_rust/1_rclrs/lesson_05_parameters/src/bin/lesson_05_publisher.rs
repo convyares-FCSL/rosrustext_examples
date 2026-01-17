@@ -1,56 +1,41 @@
-use std::sync::{
-    atomic::{AtomicBool, AtomicU64, Ordering},
-    Arc, Mutex,
-};
+use std::sync::{ atomic::{AtomicBool, Ordering}, Arc, Mutex, };
 use std::time::Duration;
 
-use rclrs::{
-    log_error, log_info, Context, CreateBasicExecutor, Executor, Logger, Node, Publisher, RclrsError,
-    RclrsErrorFilter, SpinOptions,
-};
+use rclrs::{ log_error, log_info, Context, CreateBasicExecutor, Executor, Logger, Node, Publisher, RclrsError, RclrsErrorFilter, SpinOptions, };
 
-// Workspace deps
-use lesson_interfaces::msg::MsgCount;
-use utils_rclrs::{qos, topics, utils};
+use rosrustext_rosrs::parameters::{ Descriptor, ParameterChange, ParameterNode, ParameterWatcher, Type, Value, };
 
-// Pure logic library (shared with subscriber)
 use lesson_05_logic::{period_s_to_ms_strict, TelemetryPublisherCore};
+use lesson_interfaces::msg::MsgCount;
+use utils_rclrs::{qos, topics};
+use utils_rclrs::IntoRclrsError;
 
 const NODE_NAME: &str = "lesson_05_publisher";
 const PERIOD_PARAM: &str = "timer_period_s";
 
-/// Hotfix:
-/// rclrs v0.6.x does not expose on-set parameter callbacks.
-/// Until that lands (or rosrustext bridges it), we poll parameters at a fixed rate.
-const PARAM_POLL_PERIOD: Duration = Duration::from_secs(1);
-
-/// Encapsulates the publisher and its business logic.
+/// Publishes telemetry and owns the associated business logic state.
 ///
-/// Thread-safety: shared between the timer callback (data plane) and the
-/// parameter polling loop (control plane), so the core is protected by a Mutex.
+/// This component is passive: it provides publish functionality but does not manage timers
+/// or configuration. It is referenced by timer callbacks and remains valid for the life
+/// of the node process.
 struct PublisherComponent {
     publisher: Publisher<MsgCount>,
     core: Mutex<TelemetryPublisherCore>,
-    _logger: Logger, // RAII keep-alive
 
-    // Avoid log spam: only emit the first tick error until a success occurs.
+    /// Prevents repeated log spam: logs the first tick failure until a success occurs.
     tick_failed: AtomicBool,
 }
 
 impl PublisherComponent {
+    /// Creates and configures the publisher component.
     fn new(node: &Node) -> Result<Self, RclrsError> {
-        let logger = node.logger().clone();
         let publisher = Self::create_publisher(node)?;
         let core = Mutex::new(TelemetryPublisherCore::new());
 
-        Ok(Self {
-            publisher,
-            core,
-            _logger: logger,
-            tick_failed: AtomicBool::new(false),
-        })
+        Ok(Self { publisher, core, tick_failed: AtomicBool::new(false), })
     }
 
+    /// Creates the ROS publisher with configured topic name and QoS profile.
     fn create_publisher(node: &Node) -> Result<Publisher<MsgCount>, RclrsError> {
         let topic_name = topics::telemetry(node);
         let qos_profile = qos::telemetry(node);
@@ -61,10 +46,12 @@ impl PublisherComponent {
         node.create_publisher::<MsgCount>(options)
     }
 
-    fn on_tick(&self) -> Result<(), RclrsError> {
-        let mut core = match self.core.lock() {
-            Ok(g) => g,
-            Err(_) => return Ok(()), // poisoned: skip tick and continue
+    /// Publishes the next message produced by the core.
+    ///
+    /// Lock failures are treated as non-fatal to keep the timer callback resilient.
+    fn publish(&self) -> Result<(), RclrsError> {
+        let Ok(mut core) = self.core.lock() else {
+            return Ok(());
         };
 
         let msg = core.next_message();
@@ -73,144 +60,195 @@ impl PublisherComponent {
     }
 }
 
-/// Small context object captured by the polling timer closure.
-struct ParamPollCtx {
-    timer_store: Arc<Mutex<Option<rclrs::Timer>>>,
-    comp: Arc<PublisherComponent>,
-    period_param: rclrs::MandatoryParameter<f64>,
-    last_period_ms: AtomicU64,
+/// Container for resources managed at runtime.
+///
+/// Lesson 05 replaces the publish timer when the period parameter changes.
+#[derive(Default)]
+struct ResourceState {
+    /// Publish timer; replaced on period updates.
+    timer: Option<rclrs::Timer>,
+
+    /// Last applied period in milliseconds.
+    last_period_ms: u64,
 }
 
-/// Resource Container: owns lifecycle, configuration, and the mutable timer resource.
+/// Parameter-driven publisher node.
 ///
-/// This node demonstrates "rebuild-on-update" behaviour: we replace the publish timer
-/// when the period parameter changes (publisher + core remain stable).
+/// Provides runtime reconfiguration of publish period using ParameterWatcher,
+/// without lifecycle state management.
 struct Lesson05PublisherNode {
-    pub node: Node,
-    _publisher_component: Arc<PublisherComponent>,
+    /// Shared node handle. Required because rosrustext ParameterNode binds to Arc<Node>.
+    node: Arc<Node>,
 
-    // Publish timer is hot-swapped when period changes.
-    _timer: Arc<Mutex<Option<rclrs::Timer>>>,
+    _component: Arc<PublisherComponent>,
 
-    // Hotfix polling timer keep-alive.
-    _param_poll_timer: rclrs::Timer,
+    /// Mutable state updated by parameter change callbacks.
+    _state: Arc<Mutex<ResourceState>>,
+
+    /// Parameter plumbing and watcher keep-alives.
+    _params: ParameterNode,
+    _watcher: ParameterWatcher,
 }
 
 impl Lesson05PublisherNode {
+    /// Creates the node, declares parameters, configures publisher, and starts timers.
     pub fn new(executor: &Executor) -> Result<Self, RclrsError> {
-        let node = executor.create_node(NODE_NAME)?;
+        let node = Arc::new(executor.create_node(NODE_NAME)?);
         let logger = node.logger().clone();
 
-        // Declare once and keep a handle for polling.
-        // This avoids node.get_parameter() (not in rclrs v0.6.x) and avoids double-declare.
-        let period_param = utils::declare_parameter(&node, PERIOD_PARAM, 1.0_f64)?;
-        let initial_period_s = period_param.get();
-        
-        // Be boring: if invalid, log and fall back to 1.0s.
-        let initial_period_ms = match period_s_to_ms_strict(initial_period_s) {
+        let params = ParameterNode::try_new(Arc::clone(&node)).rcl_generic()?;
+        let initial_period_s = Self::_declare_parameters(&params, &logger);
+
+        let initial_ms = match period_s_to_ms_strict(initial_period_s) {
             Ok(ms) => ms,
             Err(e) => {
-                log_error!( &logger, "Invalid initial {}='{}': {}. Defaulting to 1.0s.", PERIOD_PARAM, initial_period_s, e );
+                log_error!( &logger, "Invalid initial {}='{}': {}. Defaulting to 1.0s", PERIOD_PARAM, initial_period_s, e );
                 1000_u64
             }
         };
 
-        let comp = Arc::new(PublisherComponent::new(&node)?);
+        let component = Arc::new(PublisherComponent::new(node.as_ref())?);
 
-        let timer_store: Arc<Mutex<Option<rclrs::Timer>>> = Arc::new(Mutex::new(None));
+        let state = Arc::new(Mutex::new(ResourceState { timer: None, last_period_ms: initial_ms, }));
 
-        // Initial publish timer.
-        Self::create_or_update_timer_ms(&node, &timer_store, Arc::clone(&comp), initial_period_ms)?;
+        Self::create_or_replace_timer_ms( Arc::clone(&node), Arc::clone(&state), Arc::clone(&component), initial_ms )?;
 
-        // Hotfix adapter: poll parameter and apply updates when it changes.
-        let param_poll_timer = Self::_create_param_timer( &node, Arc::clone(&timer_store), Arc::clone(&comp), period_param, initial_period_ms )?;
+        let watcher = ParameterWatcher::new(&params).rcl_generic()?;
+
+        let node_clone = Arc::clone(&node);
+        let state_clone = Arc::clone(&state);
+        let comp_clone = Arc::clone(&component);
+
+        watcher.on_change(PERIOD_PARAM, move |change| {
+            Self::_on_param_change(&node_clone, &state_clone, &comp_clone, change);
+        });
 
         log_info!(&logger, "Lesson 05 Publisher started.");
-        Ok(Self { node, _publisher_component: comp, _timer: timer_store, _param_poll_timer: param_poll_timer })
+
+        Ok(Self { node, _component : component, _state : state, _params: params, _watcher: watcher, })
     }
 
-    fn create_or_update_timer_ms( node: &Node, timer_store: &Arc<Mutex<Option<rclrs::Timer>>>, comp: Arc<PublisherComponent>, period_ms: u64 ) -> Result<(), RclrsError> {
-        let logger = node.logger().clone();
+    /// Declares parameters and retrieves the initial timer period (seconds).
+    ///
+    /// Mirrors the Lesson 06 `_declare_parameters` pattern.
+    fn _declare_parameters(params: &ParameterNode, logger: &Logger) -> f64 {
+        let desc = Descriptor {
+            description: "Timer period in seconds".to_string(),
+            ..Descriptor::default()
+        };
 
-        // Create timer before swapping it in.
-        let tick_logger = logger.clone();
+        if let Err(e) = params.declare(PERIOD_PARAM, Type::Double, Value::Double(1.0), desc) {
+            log_error!(logger, "Parameter declaration failed: {}. Using default.", e);
+            return 1.0;
+        }
+
+        let keys = [PERIOD_PARAM.to_string()];
+        let store_arc = params.store();
+        let store = store_arc.lock().unwrap();
+
+        store.get(&keys).first().and_then(|v| match v {
+                Value::Double(v) => Some(*v),
+                Value::Integer(v) => Some(*v as f64),
+                _ => None,
+            }).unwrap_or(1.0)
+    }
+
+    /// Creates a repeating publish timer and replaces any existing timer.
+    ///
+    /// The previous timer is dropped when replaced, stopping the prior schedule.
+    fn create_or_replace_timer_ms( node: Arc<Node>, state: Arc<Mutex<ResourceState>>, component: Arc<PublisherComponent>, period_ms: u64, ) -> Result<(), RclrsError> {
+        let tick_logger = node.logger().clone();
+
         let new_timer = node.create_timer_repeating(Duration::from_millis(period_ms), move || {
-            match comp.on_tick() {
+            match component.publish() {
                 Ok(_) => {
-                    comp.tick_failed.store(false, Ordering::Relaxed);
+                    component.tick_failed.store(false, Ordering::Relaxed);
                 }
                 Err(e) => {
-                    if !comp.tick_failed.swap(true, Ordering::Relaxed) {
+                    if !component.tick_failed.swap(true, Ordering::Relaxed) {
                         log_error!(&tick_logger, "Tick failed: {}", e);
                     }
                 }
             }
         })?;
 
-        // Swap it in; drop old timer when replaced.
-        let mut guard = match timer_store.lock() {
-            Ok(g) => g,
-            Err(_) => {
-                log_error!(node.logger(), "timer_store mutex poisoned; keeping existing timer");
-                return Ok(());
-            }
+        let Ok(mut guard) = state.lock() else {
+            log_error!(node.logger(), "State lock failure during timer update");
+            return Ok(());
         };
-        guard.replace(new_timer);
 
-        log_info!( &logger, "Timer updated to {:.3}s", (period_ms as f64) / 1000.0 );
+        guard.timer = Some(new_timer);
+        guard.last_period_ms = period_ms;
+
+        log_info!(node.logger(), "Timer updated to {}ms", period_ms);
+
         Ok(())
     }
 
-    /// Hotfix adapter: poll the period parameter and apply updates when it changes.
-    fn _create_param_timer( node: &Node, timer_store: Arc<Mutex<Option<rclrs::Timer>>>, comp: Arc<PublisherComponent>,
-        period_param: rclrs::MandatoryParameter<f64>, initial_period_ms: u64 ) -> Result<rclrs::Timer, RclrsError> {
-        // Same borrow/move fix as subscriber: one clone for the call, one for the closure.
-        let node_for_timer = node.clone();
-        let node_for_cb = node.clone();
+    /// Validates a parameter change event and applies it if required.
+    ///
+    /// This function performs:
+    /// - name filtering
+    /// - type conversion
+    /// - semantic validation
+    /// - "no-op" detection
+    ///
+    /// If the update is valid and changes effective configuration, it delegates to
+    /// `_on_param_update`.
+    fn _on_param_change( node: &Arc<Node>, state: &Arc<Mutex<ResourceState>>, comp: &Arc<PublisherComponent>, change: &ParameterChange, ) {
+        if change.name != PERIOD_PARAM {
+            return;
+        }
 
-        let ctx = Arc::new(ParamPollCtx { timer_store, comp, period_param, last_period_ms: AtomicU64::new(initial_period_ms) });
-
-        node_for_timer.create_timer_repeating(PARAM_POLL_PERIOD, move || {
-            Self::_check_param(&node_for_cb, &ctx);
-        })
-    }
-
-    fn _check_param(node: &Node, ctx: &ParamPollCtx) {
-        let current_s = ctx.period_param.get();
-
-        let current_ms = match period_s_to_ms_strict(current_s) {
-            Ok(ms) => ms,
-            Err(e) => {
-                log_error!( node.logger(), "Ignoring update {}='{}': {}", PERIOD_PARAM, current_s, e );
+        let new_period_s = match &change.new_value {
+            Value::Double(v) => *v,
+            Value::Integer(v) => *v as f64,
+            _ => {
+                log_error!( node.logger(), "Ignoring {} update: expected numeric type", PERIOD_PARAM );
                 return;
             }
         };
 
-        let last_ms = ctx.last_period_ms.load(Ordering::Relaxed);
-        if current_ms == last_ms {
+        if new_period_s <= 0.0 {
+            log_error!( node.logger(), "Ignoring {} update: value must be > 0.0", PERIOD_PARAM );
             return;
         }
 
-        match Self::on_param_change(node, &ctx.timer_store, &ctx.comp, current_ms) {
-            Ok(applied_ms) => {
-                ctx.last_period_ms.store(applied_ms, Ordering::Relaxed);
-            }
-            Err(e) => {
-                log_error!( node.logger(), "Ignoring update {}='{}': {}", PERIOD_PARAM, current_s, e );
-            }
-        }
+        let Ok(new_ms) = period_s_to_ms_strict(new_period_s) else {
+            log_error!(
+                node.logger(),
+                "Ignoring {} update: failed to convert to milliseconds",
+                PERIOD_PARAM
+            );
+            return;
+        };
+
+        Self::_on_param_update(node, state, comp, new_ms);
     }
 
-    /// Callback-shaped handler: apply a new publish period (already validated to ms).
-    fn on_param_change( node: &Node, timer_store: &Arc<Mutex<Option<rclrs::Timer>>>, comp: &Arc<PublisherComponent>, new_period_ms: u64, ) -> Result<u64, RclrsError> {
-        Self::create_or_update_timer_ms(node, timer_store, Arc::clone(comp), new_period_ms)?;
-        Ok(new_period_ms)
+    /// Applies a validated timer period update.
+    ///
+    /// This recreates the publish timer and replaces the old one.
+    fn _on_param_update( node: &Arc<Node>, state: &Arc<Mutex<ResourceState>>, comp: &Arc<PublisherComponent>, new_ms: u64, ) {
+        let current_ms = {
+            let Ok(guard) = state.lock() else { return; };
+            guard.last_period_ms
+        };
+
+        if current_ms == new_ms {
+            return;
+        }
+
+        if let Err(e) = Self::create_or_replace_timer_ms( Arc::clone(node), Arc::clone(state), Arc::clone(comp), new_ms, ) {
+            log_error!(node.logger(), "Timer update failed: {}", e);
+        }
     }
 }
 
 fn main() -> Result<(), RclrsError> {
     let context = Context::default_from_env()?;
     let mut executor = context.create_basic_executor();
+
     let node = Lesson05PublisherNode::new(&executor)?;
 
     executor
@@ -218,7 +256,7 @@ fn main() -> Result<(), RclrsError> {
         .ignore_non_errors()
         .first_error()
         .map_err(|err| {
-            log_error!(node.node.logger(), "Executor stopped with error: {err}");
+            log_error!(node.node.logger(), "Executor error: {err}");
             err
         })?;
 

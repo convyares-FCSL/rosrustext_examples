@@ -1,274 +1,265 @@
-# Lesson 05 Theory: Parameters & Central Configuration (Rust / rclrs)
+# Lesson 06 Theory: Lifecycle Management (Rust / rclrs + rosrustext)
 
 ## Architectural Intent
 
-In earlier lessons, node behaviour was hardcoded (publish rate, topic names, QoS).
+In Lessons 00–05, Rust nodes followed an *eager execution* model:
 
-In Lesson 05, configuration becomes a **first-class system contract**.
+* Resources were allocated during node construction.
+* Timers, publishers, and subscriptions became active immediately.
+* Startup order implicitly defined system behavior.
 
-The goal is to demonstrate that, even with an evolving Rust client library (`rclrs`), we can:
+In Lesson 06, this model is replaced with **Managed Lifecycle Nodes**.
 
-1. **Load configuration centrally from YAML at startup**
-2. **Inspect and modify behaviour at runtime using ROS parameters**
-3. **Keep business logic isolated from middleware concerns**
-4. **Apply updates safely without restarting the process**
+The objective is **operational determinism**:
+ensuring a node is fully configured, validated, and externally approved *before* it participates in the ROS graph.
 
-This lesson mirrors the C++ (`rclcpp`) architecture as closely as the current Rust ecosystem allows.
+Because `rclrs` does not natively implement the ROS 2 lifecycle state machine, this lesson uses **`rosrustext_rosrs`** to provide:
 
----
+* A lifecycle state machine compatible with ROS 2 tooling.
+* Gated execution primitives.
+* Parameter event handling equivalent to modern `rclcpp`.
 
-## Core Concepts Introduced
-
-Lesson 05 introduces three production-grade patterns:
-
-1. **Configuration-First Design**
-   Topic names, QoS, and behavioural parameters are no longer hardcoded.
-   They are defined in shared YAML files and consumed uniformly across nodes.
-
-2. **Hot Updates via a Control Plane**
-   Runtime configuration changes are applied while the node is running.
-
-3. **Logic / Transport Separation**
-   Validation and sequencing logic lives in pure Rust, independent of ROS 2.
+This enables Rust nodes to participate in **production-grade orchestration** rather than acting as always-on scripts.
 
 ---
 
-## Code Structure Overview
+## Lifecycle Support in Rust: Important Context
 
-```text
-3_rust/
- ├── utils_rclrs                (Shared Configuration Adapter)
- └── lesson_05_parameters
-     ├── lib.rs                 (Pure Business Logic)
-     └── bin/*.rs               (Middleware Adapters)
+Unlike C++, Rust does **not** have a native equivalent of `rclcpp_lifecycle::LifecycleNode`.
+
+Instead:
+
+* **`rclrs::Node`** remains the fundamental node abstraction.
+* **`rosrustext_rosrs::LifecycleNode`** wraps an internal `rclrs::Node` and exposes:
+
+  * Lifecycle state transitions
+  * Transition callbacks
+  * Managed (gated) resources
+
+### Implication
+
+Lifecycle behavior in Rust is **compositional**, not inheritance-based.
+
+This has two important consequences:
+
+1. You cannot accidentally bypass the lifecycle by calling low-level APIs directly.
+2. Resource ownership and cleanup must be handled explicitly by user code.
+
+This is more verbose than C++, but also more explicit and auditable.
+
+---
+
+## Core Design Pattern
+
+Lesson 06 introduces a **three-layer separation**, enforced by structure rather than convention:
+
+```
+Pure Logic        → what should happen
+Component Layer  → how it happens
+Lifecycle Node   → when it is allowed to happen
 ```
 
 Each layer has a single responsibility.
 
 ---
 
-## 1. Pure Logic: `lib.rs` (No ROS Dependencies)
+## Code Walkthrough
 
-As in the C++ lesson, **all business logic is middleware-free**.
+### 1. Pure Logic Remains Lifecycle-Agnostic
+
+All business logic continues to live in `lib.rs`:
+
+* `TelemetryPublisherCore`
+* `TelemetryStreamValidator`
+* `period_s_to_ms_strict`
+
+These types:
+
+* Have **no ROS dependencies**
+* Have **no lifecycle awareness**
+* Are tested using standard Rust unit tests
+
+This ensures correctness can be validated independently of ROS infrastructure.
+
+---
+
+### 2. Lifecycle Node as the Orchestrator
+
+The `Lesson06PublisherNode` and `Lesson06SubscriberNode` structs implement:
 
 ```rust
-// Pure Rust logic, testable without ROS
-pub struct TelemetryStreamValidator {
-    expected: i64,
-    reset_max_value: i64,
-}
-
-impl TelemetryStreamValidator {
-    pub fn on_count(&mut self, count: i64) -> StreamDecision {
-        // validation logic
-    }
-}
+LifecycleCallbacksWithNode
 ```
 
-Key properties:
+This trait defines the lifecycle hooks:
 
-* No `rclrs` imports
-* No threading or timers
-* Deterministic and unit-testable
-* Mirrors `logic.hpp` in the C++ version
+* `on_configure`
+* `on_activate`
+* `on_deactivate`
+* `on_cleanup`
+* `on_shutdown`
 
-This guarantees correctness *before* integration with ROS.
+Each callback corresponds to a **controlled phase of resource ownership**.
+
+#### Key rule
+
+> **No timers, publishers, subscriptions, or parameter watchers are created outside `on_configure`.**
+
+This guarantees that an `Unconfigured` node has **no runtime footprint**.
 
 ---
 
-## 2. Shared Configuration Adapter: `utils_rclrs`
+### 3. Passive Components (Publisher / Subscriber)
 
-utils_rclrs lives outside individual lessons and is shared across all Rust examples, enforcing a single workspace-wide configuration standard, exactly like utils_cpp in the C++ track.
+The `PublisherComponent` and `SubscriberComponent` structs are **passive containers**.
 
-Just like `utils_cpp`, the Rust `utils_rclrs` crate centralises system knowledge:
+They:
+
+* Own publishers, timers, and logic
+* Expose methods like `publish()` or `on_msg()`
+* Do **not** decide when execution occurs
+
+They are:
+
+* Created during `on_configure`
+* Stored in `Arc<Option<...>>`
+* Dropped during `on_cleanup` or `on_shutdown`
+
+This ensures deterministic release of DDS resources.
+
+---
+
+## Gating Strategies in Rust
+
+Unlike C++, Rust does not get lifecycle gating “for free” from the middleware.
+
+Gating is therefore **explicit and visible in code**.
+
+### Publisher Gating (Timer-Based)
+
+In Rust, publishers are gated by **controlling execution**, not transport.
+
+* Timers are created using `create_timer_repeating_gated`
+* The timer callback is only executed while the node is `Active`
+* No timer exists in `Unconfigured`
+* Timers exist but are silent in `Inactive`
 
 ```rust
-let topic = topics::telemetry(&node);
-let qos   = qos::telemetry(&node);
+node.create_timer_repeating_gated(duration, move || {
+    component.publish();
+});
 ```
 
-### What `utils_rclrs` Actually Does (Important)
+**Effect:**
+No `publish()` call is made unless the lifecycle permits it.
 
-`utils_rclrs` **does not load YAML**.
+---
 
-Instead:
+### Subscriber Gating
 
-1. YAML files are loaded by ROS **before** the node starts
-2. `declare_parameter` registers the parameter with the node
-3. `MandatoryParameter<T>` provides typed access to the effective value
-4. If no override exists, the declared default is used
+Subscriptions are also created as **managed (gated) subscriptions**.
 
-This matches C++ behaviour exactly.
+* Messages received while `Inactive` are dropped
+* The callback is not executed unless the node is `Active`
+
+This avoids manual boolean guards inside callbacks and keeps lifecycle behavior centralized.
+
+---
+
+## Parameter Handling and Persistence
+
+Lifecycle transitions introduce a subtle but critical design decision:
+**what survives cleanup?**
+
+### In this lesson:
+
+* **Volatile resources** (timers, publishers, subscriptions, watchers)
+  → created in `on_configure`, dropped in `on_cleanup`
+* **Configuration parameters**
+  → declared during `on_configure`, retained across deactivate/cleanup
+
+### Rationale
+
+Undeclaring parameters during cleanup would:
+
+* Discard values provided via launch files or CLI
+* Prevent reliable re-configuration after cleanup
+
+Therefore, parameters are treated as **infrastructure**, not runtime state.
+
+Parameter updates are handled via:
 
 ```rust
-pub fn declare_parameter<T>(
-    node: &Node,
-    name: &str,
-    default_value: T,
-) -> Result<MandatoryParameter<T>, DeclarationError>
-where
-    T: ParameterVariant + Clone + 'static,
-{
-    node.declare_parameter(name)
-        .default(default_value)
-        .mandatory()
-}
+ParameterWatcher
 ```
 
-Across the entire Rust workspace, the adapter guarantees:
-
-* One canonical parameter name
-* One canonical type
-* Identical resolution across publisher and subscriber
+The watcher itself is lifecycle-scoped and dropped during cleanup to avoid handling updates while unconfigured.
 
 ---
 
-## 3. Middleware Adapter: The Node (Rust / rclrs)
+## Error Handling and Safety Considerations
 
-The node owns:
+Several deliberate design choices are visible in the code:
 
-* ROS resources (publishers, subscriptions, timers)
-* The logic object
-* The configuration handles
+### Lock Poisoning
 
-It acts as the **adapter** between ROS parameters and pure logic.
+* Mutex poisoning is treated as **non-fatal**
+* Callbacks exit early rather than panic
+* The node remains alive but logs the failure
 
----
-
-## 4. Runtime Updates: The “Hotfix” Control Plane
-
-### Why Polling Exists in Rust
-
-As of `rclrs v0.6.x`, there is **no equivalent** to:
-
-```cpp
-add_on_set_parameters_callback(...)
-```
-
-Rather than hiding this limitation, Lesson 05 makes it explicit and uses a **Control Plane / Data Plane split**.
+This aligns with ROS expectations for long-running processes.
 
 ---
 
-### Control Plane vs Data Plane
+### Error Normalization
 
-```rust
-// Data Plane (High frequency, deterministic)
-fn on_tick(&self) {
-    // publish data
-}
+All `rclrs` API errors are mapped into a consistent `RclrsError` form using helpers in `utils_rclrs`.
 
-// Control Plane (Low frequency, ~1 Hz)
-fn check_parameters(&self) {
-    let current = period_param.get();
-    if current != last {
-        // apply update
-    }
-}
-```
-
-Key properties:
-
-* Configuration polling is **low priority**
-* Publishing logic is **never blocked**
-* Behaviour matches callback semantics in practice
-
-This mirrors the intent of the C++ callback, even if the mechanism differs.
-
----
-
-## 5. Update Strategy 1: Rebuild-on-Update (Publisher)
-
-**Use case:** Changing infrastructure resources (timers).
-
-In Rust, as in C++, we do **not** mutate a running timer.
-
-Instead:
-
-1. Validate the new value (pure logic)
-2. Construct a new `rclrs::Timer`
-3. Swap it into a `Mutex<Option<Timer>>`
-4. Drop the old timer safely
-
-```rust
-fn on_param_change(new_period_ms: u64) {
-    create_or_update_timer(new_period_ms);
-}
-```
-
-This guarantees:
-
-* No partial state
-* No undefined timing behaviour
-* No race conditions
-
-This is the same strategy as the C++ `create_or_update_timer`.
-
----
-
-## 6. Update Strategy 2: In-Place Mutation (Subscriber)
-
-**Use case:** Logic thresholds (`reset_max_value`).
-
-Here we mutate only the logic state:
-
-```rust
-let mut v = validator.lock().unwrap();
-v.set_reset_max_value(new_value);
-```
-
-Why this is safe:
-
-* The subscription remains unchanged
-* Only a single integer is updated
-* The next message uses the new value immediately
-
-This mirrors the C++ approach of updating the validator without rebuilding the subscription.
-
----
-
-## Memory & Ownership Model (Rust Perspective)
-
-Rust enforces ownership at compile time:
-
-* `Arc<Mutex<T>>` replaces `std::unique_ptr`
-* Explicit locking replaces implicit thread safety
-* Lifetimes are enforced by the type system
-
-While more verbose, this eliminates entire classes of runtime errors.
+This avoids leaking backend-specific error types into lifecycle logic.
 
 ---
 
 ## Testing Strategy
 
-Because logic is isolated:
+Testing is split across two layers.
 
-```bash
-cargo test
-```
+### 1. Unit Tests (Rust)
 
-Unit tests validate:
-
-* Stream ordering
-* Reset detection
-* Period quantisation
-
-No ROS graph is required, just like in the C++ lesson.
+* Target: `lib.rs`
+* Scope: Logic correctness
+* Execution: `cargo test`
+* No ROS graph required
 
 ---
 
-## Why This Lesson Matters
+### 2. Integration Tests (Python / launch_testing)
 
-Lesson 05 demonstrates **professional-grade systems engineering in Rust**:
+* **Target**: The compiled Rust binary (`lesson_06_lifecycle_publisher`).
+* **Scope**: Verifying the **Process** and **State Machine**.
+* **Why Python?**: The ROS 2 Launch system is Python-based. It allows us to treat the Rust node as a "Black Box," launching it, waiting for it to spawn, and issuing Service Calls (`/change_state`) just like a real user would.
 
-* Configuration is external and inspectable
-* Logic is deterministic and testable
-* Runtime updates are safe and controlled
-* Middleware limitations are handled explicitly, not hidden
+```python
+# Python driving a Rust node
+def test_lifecycle_sequence(self):
+    # 1. Assert Start State
+    self.assertEqual(self._get_state().label, 'unconfigured')
+    
+    # 2. Drive Transition
+    self._change_state(Transition.TRANSITION_CONFIGURE)
+    
+    # 3. Assert New State
+    self.assertEqual(self._get_state().label, 'inactive')
+```
 
-This architecture scales directly to:
+---
 
-* Larger systems
-* Multiple nodes
-* Mixed Rust / C++ deployments
+## Summary
 
-It establishes a **shared mental model** across languages, not just shared YAML files.
+Lesson 06 establishes a **managed execution model** for Rust ROS 2 nodes.
+
+* Business logic is isolated and testable.
+* Resource allocation is explicit and deterministic.
+* Execution is strictly controlled by lifecycle state.
+* Runtime behavior is observable and externally orchestrated.
+
+This architecture scales to systems where **startup order, safety, and coordination matter**, rather than assuming all nodes should begin operating immediately.
