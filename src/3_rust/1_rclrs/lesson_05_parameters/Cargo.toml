@@ -8,7 +8,7 @@ edition = "2021"
 rclrs = "0.6"
 
 # RCLRS extension for parameter support
-rosrustext_rosrs = { version = "0.3.0", features = ["ros2"] }
+rosrustext_rosrs = { version = "0.4.1", features = ["ros2"] }
 
 # Utilities
 anyhow = "1.0"

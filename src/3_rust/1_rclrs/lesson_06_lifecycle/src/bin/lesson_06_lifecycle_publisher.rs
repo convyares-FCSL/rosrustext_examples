@@ -8,7 +8,7 @@ use rosrustext_rosrs::State;
 
 use lesson_06_logic::{period_s_to_ms_strict, TelemetryPublisherCore};
 use lesson_interfaces::msg::MsgCount;
-use utils_rclrs::topics;
+use utils_rclrs::{qos, topics};
 use utils_rclrs::IntoRclrsError;
 
 const NODE_NAME: &str = "lesson_06_lifecycle_publisher";
@@ -30,8 +30,9 @@ impl PublisherComponent {
 
         let raw_node = node.node();
         let topic_name = topics::telemetry(raw_node);
+        let qos_profile = qos::telemetry(raw_node);
 
-        let publisher = node.create_publisher::<MsgCount>(&topic_name).rcl_generic()?;
+        let publisher = node.publisher::<MsgCount>(&topic_name).qos(qos_profile).create().rcl_generic()?;
 
         let core = Mutex::new(TelemetryPublisherCore::new());
 
@@ -115,8 +116,8 @@ impl Lesson06PublisherNode {
         let comp_clone = Arc::clone(comp);
         let logger = node.node().logger().clone();
 
-        node.create_timer_repeating_gated(Duration::from_millis(period_ms), move || {
-            if let Err(e) = comp_clone.publish() {
+        node.timer_repeating(Duration::from_millis(period_ms)).callback(move || {
+           if let Err(e) = comp_clone.publish() {
                 // Failure is logged once until the first subsequent success.
                 if !comp_clone.tick_failed.swap(true, Ordering::Relaxed) {
                     log_error!(&logger, "Tick failed: {}", e);
@@ -124,8 +125,7 @@ impl Lesson06PublisherNode {
             } else {
                 comp_clone.tick_failed.store(false, Ordering::Relaxed);
             }
-        })
-        .rcl_generic()
+        }).create().rcl_generic()
     }
 
     /// Handles runtime parameter updates for the timer period.

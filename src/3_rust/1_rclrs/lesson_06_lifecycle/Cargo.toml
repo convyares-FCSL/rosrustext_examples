@@ -9,7 +9,7 @@ rclrs = "0.6"
 
 # Lifecycle Adapter (Published)
 # We enable "bond" to allow Nav 2 to use the lifecycle adapter
-rosrustext_rosrs = { version = "0.3.0", features = ["ros2", "bond"] }
+rosrustext_rosrs = { version = "0.4.1", features = ["ros2", "bond"] }
 
 # Utilities
 anyhow = "1.0"

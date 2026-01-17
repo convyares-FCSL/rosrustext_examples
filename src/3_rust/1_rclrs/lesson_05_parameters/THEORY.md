@@ -60,6 +60,42 @@ This mirrors the intent of `utils_cpp`: configuration knowledge lives in one pla
 
 ---
 
+## 2.5 Resource Construction: Builder Style (Option Parity, Less Wiring Noise)
+
+As the Rust ROS ecosystem evolves, resource construction (`publisher`, `subscription`,
+`timer`) has accumulated a wide option surface (topic names, QoS profiles, clock sources,
+callback shapes).
+
+To keep node code readable while preserving full `rclrs` option parity, the examples
+use a **builder-style construction API** (provided by `rosrustext_rosrs`) instead of
+manually assembling `*Options` structs at each call site.
+
+Key properties of the builder approach:
+
+* **Owned configuration**: builders store owned topic/QoS/clock data, avoiding lifetime traps.
+* **Option parity**: full `PublisherOptions`, `SubscriptionOptions`, and `TimerOptions`
+  can still be supplied when needed.
+* **Type-state safety**: subscriptions and timers require a callback before `.create()`
+  is available, eliminating “missing callback” runtime errors.
+* **No semantic change**: builders affect *how resources are constructed*, not how they behave.
+
+Example (subscriber construction):
+
+```rust
+use rosrustext_rosrs::builders::NodeBuilderExt;
+
+let sub = node
+    .subscription::<MsgCount>(&topic_name)
+    .qos(qos_profile)
+    .callback(move |msg: MsgCount| { /* ... */ })
+    .create()?;
+```
+
+This keeps Lesson 05 focused on configuration and update semantics, while providing a
+scalable construction pattern as the API surface grows.
+
+---
+
 ## 3. Runtime Updates: ParameterWatcher (No Polling)
 
 Lesson 05 uses `rosrustext_rosrs::ParameterWatcher` to receive parameter change events and apply updates immediately.
@@ -76,7 +112,8 @@ The callback path performs:
 3. no-op detection (ignore unchanged values)
 4. application of the new configuration
 
-This matches the operational behaviour expected from other ROS 2 client libraries: parameter updates take effect without process restart.
+This matches the operational behaviour expected from other ROS 2 client libraries:
+parameter updates take effect without process restart.
 
 ---
 
@@ -84,7 +121,8 @@ This matches the operational behaviour expected from other ROS 2 client librarie
 
 ### Strategy A: Rebuild-on-Update (Publisher Timer)
 
-Changing `timer_period_s` affects a scheduling resource (a timer). Rather than attempting to mutate an active timer, the publisher:
+Changing `timer_period_s` affects a scheduling resource (a timer). Rather than attempting to
+mutate an active timer, the publisher:
 
 1. validates the new value
 2. creates a new timer with the updated period
@@ -106,7 +144,16 @@ Changing `reset_max_value` affects only validation thresholds. The subscriber:
 3. updates a single field (`reset_max_value`)
 4. releases the lock
 
-The subscription itself is unchanged, and the next message is evaluated using the new setting immediately.
+The subscription itself is unchanged, and the next message is evaluated using the new
+setting immediately.
+
+---
+
+## 4.5 Timers and Option Surfaces
+
+Timer replacement follows the same rebuild-on-update strategy described earlier.
+The builder style simply provides a cleaner way to select timer options (period, clock)
+without changing the underlying update semantics.
 
 ---
 

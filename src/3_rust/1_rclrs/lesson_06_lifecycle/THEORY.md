@@ -34,7 +34,7 @@ Instead:
 
   * Lifecycle state transitions
   * Transition callbacks
-  * Managed (gated) resources
+  * Managed (gated) execution primitives
 
 ### Implication
 
@@ -45,27 +45,27 @@ This has two important consequences:
 1. You cannot accidentally bypass the lifecycle by calling low-level APIs directly.
 2. Resource ownership and cleanup must be handled explicitly by user code.
 
-This is more verbose than C++, but also more explicit and auditable.
+This is more verbose than C++, but also more explicit, auditable, and predictable.
 
 ---
 
 ## Core Design Pattern
 
-Lesson 06 introduces a **three-layer separation**, enforced by structure rather than convention:
+Lesson 06 enforces a **three-layer separation**, by structure rather than convention:
 
 ```
+
 Pure Logic        → what should happen
 Component Layer  → how it happens
 Lifecycle Node   → when it is allowed to happen
-```
+
+````
 
 Each layer has a single responsibility.
 
 ---
 
-## Code Walkthrough
-
-### 1. Pure Logic Remains Lifecycle-Agnostic
+## 1. Pure Logic Remains Lifecycle-Agnostic
 
 All business logic continues to live in `lib.rs`:
 
@@ -83,15 +83,15 @@ This ensures correctness can be validated independently of ROS infrastructure.
 
 ---
 
-### 2. Lifecycle Node as the Orchestrator
+## 2. Lifecycle Node as the Orchestrator
 
-The `Lesson06PublisherNode` and `Lesson06SubscriberNode` structs implement:
+`Lesson06PublisherNode` and `Lesson06SubscriberNode` implement:
 
 ```rust
 LifecycleCallbacksWithNode
-```
+````
 
-This trait defines the lifecycle hooks:
+This trait defines lifecycle hooks:
 
 * `on_configure`
 * `on_activate`
@@ -101,91 +101,130 @@ This trait defines the lifecycle hooks:
 
 Each callback corresponds to a **controlled phase of resource ownership**.
 
-#### Key rule
+### Hard rule
 
-> **No timers, publishers, subscriptions, or parameter watchers are created outside `on_configure`.**
+> **No publishers, subscriptions, timers, or parameter watchers are created outside `on_configure`.**
 
-This guarantees that an `Unconfigured` node has **no runtime footprint**.
+An `Unconfigured` node has **zero runtime footprint**.
 
 ---
 
-### 3. Passive Components (Publisher / Subscriber)
+## 3. Builder-Based Resource Construction (Managed)
 
-The `PublisherComponent` and `SubscriberComponent` structs are **passive containers**.
+Lesson 06 adopts **builder-style APIs** for all lifecycle-managed resources.
+
+This replaces earlier `create_*` helpers with explicit construction flows that:
+
+* Preserve full `rclrs` option parity
+* Store only owned configuration
+* Enforce correct ordering (e.g. callbacks required before creation)
+* Make lifecycle gating visible and auditable
+
+### Managed Publisher
+
+```rust
+let publisher = node
+    .publisher::<MsgCount>(&topic)
+    .create()?;
+```
+
+Properties:
+
+* Publisher exists only after `on_configure`
+* Publish calls are gated by lifecycle state
+* No DDS traffic occurs unless the node is `Active`
+
+---
+
+### Managed Timer (Gated Execution)
+
+```rust
+let timer = node
+    .timer_repeating(Duration::from_millis(period_ms))
+    .callback(move || {
+        component.publish();
+    })
+    .create()?;
+```
+
+Key points:
+
+* The timer **exists** in `Inactive`, but its callback is silent
+* Callback execution begins only in `Active`
+* The timer is dropped during `on_cleanup`
+
+Gating occurs at **callback entry**, not inside user code.
+
+---
+
+### Managed Subscription (Lifecycle-Aware)
+
+```rust
+let sub = node
+    .subscription::<MsgCount>(&topic)
+    .callback(move |msg| {
+        component.on_msg(msg);
+    })
+    .create()?;
+```
+
+Behavior:
+
+* Subscriptions are lifecycle-scoped
+* Callbacks are suppressed unless the node is `Active`
+* No manual `if active { … }` guards are required
+
+---
+
+## 4. Passive Components (Publisher / Subscriber)
+
+`PublisherComponent` and `SubscriberComponent` are **passive containers**.
 
 They:
 
-* Own publishers, timers, and logic
+* Own publishers, timers, and validation logic
 * Expose methods like `publish()` or `on_msg()`
 * Do **not** decide when execution occurs
+
+Lifecycle logic determines *when* they are allowed to run.
 
 They are:
 
 * Created during `on_configure`
-* Stored in `Arc<Option<...>>`
-* Dropped during `on_cleanup` or `on_shutdown`
+* Stored in `Arc<Option<…>>`
+* Dropped deterministically during `on_cleanup` or `on_shutdown`
 
-This ensures deterministic release of DDS resources.
-
----
-
-## Gating Strategies in Rust
-
-Unlike C++, Rust does not get lifecycle gating “for free” from the middleware.
-
-Gating is therefore **explicit and visible in code**.
-
-### Publisher Gating (Timer-Based)
-
-In Rust, publishers are gated by **controlling execution**, not transport.
-
-* Timers are created using `create_timer_repeating_gated`
-* The timer callback is only executed while the node is `Active`
-* No timer exists in `Unconfigured`
-* Timers exist but are silent in `Inactive`
-
-```rust
-node.create_timer_repeating_gated(duration, move || {
-    component.publish();
-});
-```
-
-**Effect:**
-No `publish()` call is made unless the lifecycle permits it.
+This ensures clean DDS teardown and predictable resource lifetimes.
 
 ---
 
-### Subscriber Gating
+## 5. Parameter Handling and Lifecycle Boundaries
 
-Subscriptions are also created as **managed (gated) subscriptions**.
-
-* Messages received while `Inactive` are dropped
-* The callback is not executed unless the node is `Active`
-
-This avoids manual boolean guards inside callbacks and keeps lifecycle behavior centralized.
-
----
-
-## Parameter Handling and Persistence
-
-Lifecycle transitions introduce a subtle but critical design decision:
+Lifecycle introduces a critical distinction:
 **what survives cleanup?**
 
 ### In this lesson:
 
-* **Volatile resources** (timers, publishers, subscriptions, watchers)
-  → created in `on_configure`, dropped in `on_cleanup`
-* **Configuration parameters**
-  → declared during `on_configure`, retained across deactivate/cleanup
+* **Volatile runtime resources**
+
+  * publishers
+  * subscriptions
+  * timers
+  * parameter watchers
+    → created in `on_configure`, dropped in `on_cleanup`
+
+* **Declared parameters**
+  → retained across deactivate / cleanup
 
 ### Rationale
 
-Undeclaring parameters during cleanup would:
+Parameters represent **system configuration**, not runtime state.
 
-* Discard values provided via launch files or CLI
-* Prevent reliable re-configuration after cleanup
+Undeclaring them would:
 
-Therefore, parameters are treated as **infrastructure**, not runtime state.
+* Discard launch-time overrides
+* Break reconfiguration workflows
+* Diverge from ROS 2 expectations
 
 Parameter updates are handled via:
 
@@ -193,73 +232,71 @@ Parameter updates are handled via:
 ParameterWatcher
 ```
 
-The watcher itself is lifecycle-scoped and dropped during cleanup to avoid handling updates while unconfigured.
+The watcher itself is lifecycle-scoped and destroyed during cleanup, preventing updates from being applied while unconfigured.
 
 ---
 
-## Error Handling and Safety Considerations
+## 6. Error Handling and Safety
 
-Several deliberate design choices are visible in the code:
+Several deliberate design choices appear in the code.
 
 ### Lock Poisoning
 
 * Mutex poisoning is treated as **non-fatal**
-* Callbacks exit early rather than panic
-* The node remains alive but logs the failure
+* Callbacks exit early
+* The process continues running
 
-This aligns with ROS expectations for long-running processes.
+This matches ROS expectations for long-lived nodes.
 
 ---
 
 ### Error Normalization
 
-All `rclrs` API errors are mapped into a consistent `RclrsError` form using helpers in `utils_rclrs`.
+All backend errors are normalized to `RclrsError` via helpers in `utils_rclrs`.
 
-This avoids leaking backend-specific error types into lifecycle logic.
+Lifecycle logic never depends on backend-specific error types.
 
 ---
 
-## Testing Strategy
+## 7. Testing Strategy
 
-Testing is split across two layers.
+Testing is split across layers.
 
-### 1. Unit Tests (Rust)
+### Unit Tests (Rust)
 
 * Target: `lib.rs`
-* Scope: Logic correctness
+* Scope: Pure logic
 * Execution: `cargo test`
 * No ROS graph required
 
 ---
 
-### 2. Integration Tests (Python / launch_testing)
+### Integration Tests (Python / launch_testing)
 
-* **Target**: The compiled Rust binary (`lesson_06_lifecycle_publisher`).
-* **Scope**: Verifying the **Process** and **State Machine**.
-* **Why Python?**: The ROS 2 Launch system is Python-based. It allows us to treat the Rust node as a "Black Box," launching it, waiting for it to spawn, and issuing Service Calls (`/change_state`) just like a real user would.
+Lifecycle behavior is verified externally:
+
+* Node is launched as a black-box binary
+* Python drives lifecycle transitions via services
+* State transitions are asserted explicitly
 
 ```python
-# Python driving a Rust node
 def test_lifecycle_sequence(self):
-    # 1. Assert Start State
     self.assertEqual(self._get_state().label, 'unconfigured')
-    
-    # 2. Drive Transition
     self._change_state(Transition.TRANSITION_CONFIGURE)
-    
-    # 3. Assert New State
     self.assertEqual(self._get_state().label, 'inactive')
 ```
+
+This mirrors how real operators interact with lifecycle-managed systems.
 
 ---
 
 ## Summary
 
-Lesson 06 establishes a **managed execution model** for Rust ROS 2 nodes.
+Lesson 06 establishes **deterministic, externally orchestrated execution** for Rust ROS 2 nodes.
 
-* Business logic is isolated and testable.
-* Resource allocation is explicit and deterministic.
-* Execution is strictly controlled by lifecycle state.
-* Runtime behavior is observable and externally orchestrated.
+* Builders make resource construction explicit and auditable.
+* Lifecycle controls *when* execution occurs.
+* Logic remains pure and testable.
+* Runtime behavior is predictable, inspectable, and safe.
 
-This architecture scales to systems where **startup order, safety, and coordination matter**, rather than assuming all nodes should begin operating immediately.
+This model scales to systems where **startup order, safety, and coordination matter**, rather than assuming nodes should begin operating immediately.

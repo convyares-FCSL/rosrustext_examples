@@ -37,17 +37,10 @@ impl SubscriberComponent {
         let validator = Arc::new(Mutex::new(TelemetryStreamValidator::new(initial_reset_max)));
         let validator_cb = Arc::clone(&validator);
 
-        let mut sub_opts = rclrs::SubscriptionOptions::new(&topic_name);
-        sub_opts.qos = qos_profile;
-
-        let sub = node.create_subscription::<MsgCount, _>(sub_opts, move |msg| {
-            let Ok(mut v) = validator_cb.lock() else {
-                // Validator lock failure is treated as non-fatal.
-                return;
-            };
+        let sub = node.subscription::<MsgCount>(&topic_name).qos(qos_profile).callback(move |msg: MsgCount| {
+            let Ok(mut v) = validator_cb.lock() else { return; };  // Validator lock failure is treated as non-fatal.
             Self::on_msg(&logger, &mut v, &msg);
-        })
-        .rcl_generic()?;
+        }).create().rcl_generic()?;
 
         log_info!(node.node().logger(), "Component configured: subscriber on '{}'", topic_name);
 

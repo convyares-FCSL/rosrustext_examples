@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex};
 use rclrs::{ log_error, log_info, log_warn, Context, CreateBasicExecutor, Executor, Logger, Node, RclrsError, RclrsErrorFilter, SpinOptions, };
 
 use rosrustext_rosrs::parameters::{  Descriptor, ParameterChange, ParameterNode, ParameterWatcher, Type, Value, };
+use rosrustext_rosrs::builders::NodeBuilderExt;
 
 use lesson_05_logic::{StreamEvent, TelemetryStreamValidator};
 use lesson_interfaces::msg::MsgCount;
@@ -36,16 +37,10 @@ impl SubscriberComponent {
         let validator = Arc::new(Mutex::new(TelemetryStreamValidator::new(initial_reset_max)));
         let validator_cb = Arc::clone(&validator);
 
-        let mut sub_opts = rclrs::SubscriptionOptions::new(&topic_name);
-        sub_opts.qos = qos_profile;
-
-        let sub = node.create_subscription::<MsgCount, _>(sub_opts, move |msg| {
-            let Ok(mut v) = validator_cb.lock() else {
-                // Validator lock failure is treated as non-fatal.
-                return;
-            };
+        let sub = node.subscription::<MsgCount>(&topic_name).qos(qos_profile).callback(move |msg| {
+            let Ok(mut v) = validator_cb.lock() else { return; };
             Self::on_msg(&logger, &mut v, &msg);
-        })?;
+        }).create()?;
 
         log_info!(node.logger(), "Component configured: subscriber on '{}'", topic_name);
 

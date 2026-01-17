@@ -4,6 +4,7 @@ use std::time::Duration;
 use rclrs::{ log_error, log_info, Context, CreateBasicExecutor, Executor, Logger, Node, Publisher, RclrsError, RclrsErrorFilter, SpinOptions, };
 
 use rosrustext_rosrs::parameters::{ Descriptor, ParameterChange, ParameterNode, ParameterWatcher, Type, Value, };
+use rosrustext_rosrs::builders::NodeBuilderExt;
 
 use lesson_05_logic::{period_s_to_ms_strict, TelemetryPublisherCore};
 use lesson_interfaces::msg::MsgCount;
@@ -40,10 +41,7 @@ impl PublisherComponent {
         let topic_name = topics::telemetry(node);
         let qos_profile = qos::telemetry(node);
 
-        let mut options = rclrs::PublisherOptions::new(topic_name.as_str());
-        options.qos = qos_profile;
-
-        node.create_publisher::<MsgCount>(options)
+        node.publisher::<MsgCount>(topic_name).qos(qos_profile).create()
     }
 
     /// Publishes the next message produced by the core.
@@ -159,7 +157,7 @@ impl Lesson05PublisherNode {
     fn create_or_replace_timer_ms( node: Arc<Node>, state: Arc<Mutex<ResourceState>>, component: Arc<PublisherComponent>, period_ms: u64, ) -> Result<(), RclrsError> {
         let tick_logger = node.logger().clone();
 
-        let new_timer = node.create_timer_repeating(Duration::from_millis(period_ms), move || {
+        let new_timer = node.timer_repeating(Duration::from_millis(period_ms)).callback(move || {
             match component.publish() {
                 Ok(_) => {
                     component.tick_failed.store(false, Ordering::Relaxed);
@@ -170,7 +168,7 @@ impl Lesson05PublisherNode {
                     }
                 }
             }
-        })?;
+        }).create()?;
 
         let Ok(mut guard) = state.lock() else {
             log_error!(node.logger(), "State lock failure during timer update");
