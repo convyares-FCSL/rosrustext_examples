@@ -6,7 +6,7 @@
 
 namespace services {
 
-inline constexpr char DEFAULT_COMPUTE_STATS[] = "/compute_stats";
+inline constexpr char DEFAULT_COMPUTE_STATS[] = "/tutorial/compute_stats";
 
 /**
  * @brief Get the compute_stats service name.

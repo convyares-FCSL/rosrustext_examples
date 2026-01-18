@@ -146,17 +146,17 @@ If a script feels “strict”, that is intentional — it prevents silent diver
 
 ## Automated Verification
 
-You can run a suite of automated tests to verify that built lessons behave correctly (pub/sub flow, service calls, parameter config).
+You can run automated tests to verify that built lessons behave correctly. 
 
 ### Run All Tests
 ```bash
-./scripts/test_all.sh
+./scripts/04_tests/run_all.sh
 ```
 
 This script:
-1. Sources the workspace (`install/setup.bash`)
-2. runs `scripts/04_tests/run_tests.py`
-3. Checks each lesson for each language track
-4. Prints a summary table (PASS/FAIL/SKIP)
+1. Sources the workspace and environment.
+2. Runs individual track suites (`run_python.sh`, `run_cpp.sh`, `run_rclrs.sh`).
+3. Uses a shared hygiene helper (`scripts/05_utils/test_helpers.sh`) to ensure no residue is left between tracks.
+4. Prints a final summary table of all tracks.
 
-**Note:** Lesson 00 is not tested as it has no runtime behavior. Tests cover Lessons 01-05.
+**Note:** Tests cover Lessons 01-06. Logs are written to `log/tests/<track>/`.

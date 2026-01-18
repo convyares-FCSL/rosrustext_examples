@@ -83,3 +83,5 @@ if(BUILD_TESTING)
     TARGET lesson_06_lifecycle_publisher
   )
 endif()
+
+ament_package()

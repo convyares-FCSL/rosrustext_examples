@@ -2,7 +2,7 @@ use crate::utils::declare_parameter;
 use rclrs::Node;
 use std::sync::Arc;
 
-pub const DEFAULT_COMPUTE_STATS: &str = "/compute_stats";
+pub const DEFAULT_COMPUTE_STATS: &str = "/tutorial/compute_stats";
 
 pub fn compute_stats(node: &Node) -> String {
     let default: Arc<str> = Arc::from(DEFAULT_COMPUTE_STATS);

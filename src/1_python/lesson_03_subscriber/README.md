@@ -4,7 +4,7 @@
 
 Create a node that:
 
-* subscribes to the shared `chatter` topic
+* subscribes to the shared `/tutorial/chatter` topic
 * receives a custom `MsgCount` message
 * uses shared configuration for topic name and QoS
 * validates message flow at runtime
@@ -39,7 +39,7 @@ ros2 run lesson_03_subscriber_py lesson_03_subscriber
 **Expected output (idle):**
 
 ```text
-[INFO] [lesson_03_node]: Lesson 03 node started. Subscribing to 'chatter'
+[INFO] [lesson_03_node]: Lesson 03 node started. Subscribing to '/tutorial/chatter'
 ```
 
 The node remains silent until data is received.
@@ -56,7 +56,7 @@ Publish a single message to validate connectivity and QoS compatibility.
 Terminal 2:
 
 ```bash
-ros2 topic pub /chatter lesson_interfaces/msg/MsgCount "{count: 1}" --once
+ros2 topic pub /tutorial/chatter lesson_interfaces/msg/MsgCount "{count: 1}" --once
 ```
 
 Terminal 1 output:
@@ -84,7 +84,7 @@ In a second terminal, start the **Rust publisher from Lesson 02**.
 Terminal 2:
 
 ```bash
-ros2 run lesson_02_publisher_rclrs lesson_02_node
+ros2 run lesson_02_publisher_py lesson_02_publisher
 ```
 
 Terminal 1 output:
@@ -112,7 +112,7 @@ This confirms:
 Inspect the active subscription and QoS settings:
 
 ```bash
-ros2 topic info -v /chatter
+ros2 topic info -v /tutorial/chatter
 ```
 
 Verify:

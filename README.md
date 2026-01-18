@@ -231,7 +231,21 @@ Controlled concurrency instead of implicit threading.
 
 ---
 
-### Lesson 09 – Launch & Configuration Discovery (Planned)
+### Lesson 09 – Composition (Planned)
+
+**Goal**
+ 
+
+**Focus**
+Node composition.
+
+**Architecture**
+No hardcoded paths; runtime discovery only.
+
+
+---
+
+### Lesson 10 – Launch & Configuration Discovery (Planned)
 
 **Goal**
 Production-grade startup.
@@ -241,6 +255,38 @@ Launch files, installed vs source-tree configuration.
 
 **Architecture**
 No hardcoded paths; runtime discovery only.
+
+---
+
+---
+
+## Testing
+
+This workspace includes a robust testing suite for Python, C++, and Rust (`rclrs`) tracks. The tests verify node functionality, communication (pub/sub/service), parameter handling, and lifecycle orchestration.
+
+### Track Commands
+
+You can run tests for a specific track or all tracks at once:
+
+| Track | Command |
+|-------|---------|
+| **All Tracks** | `./scripts/04_tests/run_all.sh` |
+| Python | `./scripts/04_tests/run_python.sh` |
+| C++ | `./scripts/04_tests/run_cpp.sh` |
+| Rust (rclrs) | `./scripts/04_tests/run_rclrs.sh` |
+
+### Logs & Interpretation
+
+Test logs are stored in `log/tests/`, grouped by track (e.g., `log/tests/python/`). 
+A **PASS** indicates the node output matches the expected pattern (regex) or the logic verification succeeded.
+
+### Test Hygiene & "Ghost Nodes"
+
+The suite implements a strict hygiene mechanism to ensure clean runs:
+- **Process Groups**: Every node is launched in a dedicated process group (`setsid -w`).
+- **Traps**: Scripts use bash traps to ensure all processes are terminated (SIGTERM followed by SIGKILL) on exit, failure, or interruption (Ctrl+C).
+- **Graph & Residue Check**: Scripts verify the ROS graph is sterile between runs.
+- **Daemon Flushing**: If a "ghost node" (a node visible in the graph whose process has actually terminated) is detected, the script automatically restarts the `ros2 daemon` to flush the cache.
 
 ---
 

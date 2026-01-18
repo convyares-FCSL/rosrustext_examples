@@ -1,66 +1,151 @@
-This is the definitive **Strategic Intent** for the "Operational Maturity" trilogy (Lessons 06–08).
-
-It synthesizes the "Foundations First" approach with the "Problem  Solution" pedagogical arc into a single coherent narrative.
+## The Narrative Arc: “Build → Break → Fix → Deploy”
 
 ---
 
-# Strategic Intent: The Operational Maturity Arc (Lessons 06–08)
+## Phase 1: The Chassis (Lesson 06)
 
-**Goal:** Transition from writing *functional* code (that sends messages) to writing *resilient* systems (that survive production loads).
+### **Lesson 06 – The Managed Node**
 
-This trilogy of lessons forms a single continuous narrative. We do not just build features; we build a system, stress-test it until it breaks, and then engineer the solution.
+**Theme:** Determinism before features.
 
----
+We abandon “always-on” scripts and introduce the **Lifecycle State Machine**.
 
-## The Narrative Arc: "Build, Break, Fix"
+**Artifact**
 
-### Phase 1: The Chassis (Lesson 06)
+* A node that starts silent (`Unconfigured`)
+* Allocates resources only on `Configure`
+* Emits data only when `Active`
 
-**"The Managed Node"**
-We abandon the "always-on" script in favor of the **Lifecycle State Machine**.
+**Win**
 
-* **The Artifact**: A node that starts silent (`Unconfigured`), waits for orders, and only emits data when `Active`.
-* **The Win**: Deterministic startup and standard compliance (Nav2 ready).
-* **The Limit**: It is single-threaded. It works perfectly... as long as the work is light.
+* Deterministic startup
+* Tool parity (`ros2 lifecycle`)
+* Nav2-compatible behavior
 
-### Phase 2: The Stress Test (Lesson 07)
+**Limit**
 
-**"The Cardiac Arrest"**
-We install a heavy feature—a long-running **Synchronous Action** (Fibonacci)—into our robust chassis.
+* Single-threaded
+* Assumes work is light
 
-* **The Artifact**: A standard Action Server added to the Lifecycle Node.
-* **The Failure**: When the Action runs, the main thread blocks. The Lifecycle "Heartbeat" (Telemetry Publisher) stops. The node becomes unresponsive to administrative commands (`/get_state` times out).
-* **The Lesson**: Functional correctness (the math is right)  Operational correctness (the node is dead).
-
-### Phase 3: The Solution (Lesson 08)
-
-**"The Concurrency Fix"**
-We introduce **Executors** and **Callback Groups** not as an abstract optimization, but as a survival necessity.
-
-* **The Artifact**: We move the Action callback into a `ReentrantCallbackGroup` and spin the node on a `MultiThreadedExecutor`.
-* **The Win**: The Action crunches numbers on a worker thread. The Lifecycle Heartbeat resumes on the main thread.
-* **The Insight**: Concurrency is not about performance; it is about **Availability**.
+This is a *correct* node — but not yet a *survivable* one.
 
 ---
 
-## Why This Order? (Pedagogical Strategy)
+## Phase 2: The Stress Test (Lesson 07)
 
-We deliberately reject the "Happy Path" (teaching Executors before Actions) to enforce a critical engineering mindset:
+### **Lesson 07 – The Cardiac Arrest**
 
-1. **Avoid Premature Optimization**: Students should not add complexity (threading) until they see the bottleneck (blocking).
-2. **Visceral Failure**: A "frozen" robot is a stronger teacher than a textbook diagram. By watching the heartbeat die in Lesson 07, the student internalizes *why* the main thread is sacred.
-3. **The "Refactor" Reality**: Real engineering involves building a component, realizing it blocks the system, and refactoring for concurrency. This sequence mirrors the professional development cycle.
+**Theme:** Functional correctness ≠ operational correctness.
+
+We add a **long-running synchronous Action** to the lifecycle node.
+
+**Artifact**
+
+* Action server embedded in the managed node
+* Heartbeat / telemetry publisher remains on the main execution path
+
+**Failure**
+
+* Action blocks the executor
+* Heartbeat stops
+* Lifecycle services become unresponsive
+* `/get_state` times out
+
+**Lesson**
+
+* The math is correct
+* The node is dead
+
+This is the moment students learn that **the main thread is sacred**.
 
 ---
 
-## The Unified Architecture
+## Phase 3: The Fix (Lesson 08)
 
-At the end of Lesson 08, the student possesses the **Gold Standard Architecture** for ROS 2 development:
+### **Lesson 08 – Executors & Callback Groups**
 
-1. **Configuration**: Loaded centrally (L05).
-2. **State**: Managed by Lifecycle (L06).
-3. **Logic**: Isolated in pure structs (L04).
-4. **Work**: Handled by Actions (L07).
-5. **Execution**: Parallelized by Executors (L08).
+**Theme:** Concurrency as availability, not optimization.
 
-This is no longer a tutorial node; it is a production-grade microservice.
+We fix the failure explicitly.
+
+**Artifact**
+
+* Action moved into a `ReentrantCallbackGroup`
+* Node spun by a `MultiThreadedExecutor`
+
+**Win**
+
+* Action runs without blocking
+* Heartbeat continues
+* Lifecycle services remain responsive
+
+**Insight**
+
+* Executors are not about speed
+* They are about **survival under load**
+
+At this point, the student has a **production-grade ROS 2 microservice**.
+
+---
+
+## Phase 4: Deployment Reality (Lesson 09)
+
+### **Lesson 09 – Composition & Containers**
+
+**Theme:** Nodes are correct. Now deployment breaks them.
+
+We change **nothing** about node logic.
+We change **how nodes are deployed**.
+
+**Artifact**
+
+* A **Component Container** process
+* Multiple previously-built nodes loaded at runtime:
+
+  * publisher
+  * verifier/subscriber
+  * service server
+  * action server
+
+**Focus**
+
+* Composable nodes as a *deployment pattern*
+* Shared executor ownership
+* Load / unload / list via standard ROS tools
+* Shared-fate failure modes
+* Callback group isolation under composition
+
+**Failure (Intentional)**
+
+* Poor callback group choices cause interference
+* Shared executor reveals hidden assumptions
+* Shutdown order and lifecycle transitions matter
+
+**Win**
+
+* Nodes behave identically to standalone processes
+* `ros2 component load/list/unload` works
+* Launch and CLI tooling observe full parity
+
+**Core Insight**
+
+> Composition doesn’t change *what* your node does.
+> It exposes whether your architecture was honest.
+
+---
+
+## Unified Architecture (Post-Lesson 09)
+
+By the end of Lesson 09, the student owns a **deployment-ready system**:
+
+1. **Configuration** – Centralized, live (L05)
+2. **State** – Lifecycle-managed (L06)
+3. **Logic** – Pure, testable, ROS-free (L04)
+4. **Work** – Actions with cancellation & feedback (L07)
+5. **Concurrency** – Executors & callback groups (L08)
+6. **Deployment** – Composable containers, runtime topology (L09)
+
+This is no longer “ROS 2 code”.
+
+This is **operable infrastructure**.
+

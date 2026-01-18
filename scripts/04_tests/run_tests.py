@@ -7,7 +7,37 @@ import re
 import signal
 import sys
 import yaml
+import atexit
 from pathlib import Path
+
+# --- Global Tracking ---
+ACTIVE_PROCESSES = []
+
+def cleanup_processes(signum=None, frame=None):
+    # If called from signal handler, we might want to log it
+    if signum:
+        pass
+        
+    for proc in ACTIVE_PROCESSES:
+        if proc.poll() is None:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+            except:
+                pass
+    time.sleep(1)
+    for proc in ACTIVE_PROCESSES:
+        if proc.poll() is None:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except:
+                pass
+    
+    if signum:
+        sys.exit(1)
+
+atexit.register(cleanup_processes)
+signal.signal(signal.SIGINT, cleanup_processes)
+signal.signal(signal.SIGTERM, cleanup_processes)
 
 # --- Configuration ---
 
@@ -56,7 +86,7 @@ LESSONS = [
         "id": "04",
         "name": "lesson_04_service",
         "type": "service",
-        "service_name": "/compute_stats",
+        "service_name": "/tutorial/compute_stats",
         "service_type": "lesson_interfaces/srv/ComputeStats",
         "req_data": "{data: [1.0, 2.0, 3.0]}",
         "verify_regex": r"sum=6.0",
@@ -94,12 +124,11 @@ def run_command_timeout(cmd, timeout_sec, verify_regex=None, cwd=WORKSPACE_ROOT)
             preexec_fn=os.setsid,
             universal_newlines=True
         )
+        ACTIVE_PROCESSES.append(proc)
         
         output = ""
         try:
             # Wait for command to finish or timeout
-            # For persistent nodes (timeout expected), this raises TimeoutExpired
-            # For quick commands, it returns (stdout, stderr)
             stdout, _ = proc.communicate(timeout=timeout_sec)
             output = stdout
             
@@ -112,17 +141,17 @@ def run_command_timeout(cmd, timeout_sec, verify_regex=None, cwd=WORKSPACE_ROOT)
             
         except subprocess.TimeoutExpired as e:
             # Process timed out (still running). Kill it.
-            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-            # Get the partial output
-            # communicate() usually sets stdout on the exception in newer Python; 
-            # if not, we might lose it, but usually text mode works.
-            # actually e.stdout is bytes or string.
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+            except:
+                pass
+            
+            # communicate() usually sets stdout on the exception in newer Python
             output = e.stdout if e.stdout else ""
             if isinstance(output, bytes):
                 output = output.decode('utf-8', errors='replace')
                 
             if not output:
-                 # sometimes it might process
                  output = "[TIMEOUT - No Output Captured]"
             
             if verify_regex:
@@ -159,6 +188,7 @@ def run_background_node(cmd, cwd=WORKSPACE_ROOT):
         env=env,
         preexec_fn=os.setsid
     )
+    ACTIVE_PROCESSES.append(proc)
     return proc, out_file
 
 def kill_process(proc):
