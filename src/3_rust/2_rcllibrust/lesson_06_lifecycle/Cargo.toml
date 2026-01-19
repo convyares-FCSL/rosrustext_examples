@@ -1,0 +1,31 @@
+[package]
+name = "lesson_06_lifecycle_roslibrust"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+roslibrust = "0.18"
+rosrustext_roslibrust = { version = "0.2.2", features = ["roslibrust"] }
+anyhow = "1.0"
+env_logger = "0.10"
+log = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+utils_roslibrust = { path = "../utils_roslibrust" }
+tokio-util = { version = "0.7.18", features = ["full"] }
+async-trait = "0.1"
+
+
+[lib]
+name = "lesson_06_lifecycle_roslibrust"
+path = "src/lib.rs"
+
+[[bin]]
+name = "lesson_06_lifecycle_publisher"
+path = "src/bin/lesson_06_lifecycle_publisher.rs"
+
+[[bin]]
+name = "lesson_06_lifecycle_subscriber"
+path = "src/bin/lesson_06_lifecycle_subscriber.rs"

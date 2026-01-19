@@ -1,3 +1,10 @@
+# Import the existing helper
 from .utils import _get_or_declare
+# Import the new Lifecycle Shim
+from .lifecycle import LifecycleNode
 
-__all__ = ["_get_or_declare"]
+# Export both so they can be imported directly from 'utils_py'
+__all__ = [
+    "_get_or_declare",
+    "LifecycleNode",
+]

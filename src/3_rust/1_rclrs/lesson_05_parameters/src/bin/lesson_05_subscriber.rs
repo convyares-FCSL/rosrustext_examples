@@ -1,74 +1,56 @@
-use std::sync::{atomic::{AtomicI64, Ordering},Arc, Mutex};
-use std::time::Duration;
+use std::sync::{Arc, Mutex};
 
-use rclrs::{
-    log_error, log_info, log_warn, Context, CreateBasicExecutor, Executor, Logger, Node, RclrsError,
-    RclrsErrorFilter, SpinOptions,
-};
+use rclrs::{ log_error, log_info, log_warn, Context, CreateBasicExecutor, Executor, Logger, Node, RclrsError, RclrsErrorFilter, SpinOptions, };
 
-// Workspace deps
-use lesson_interfaces::msg::MsgCount;
-use utils_rclrs::{qos, topics, utils};
+use rosrustext_rosrs::parameters::{  Descriptor, ParameterChange, ParameterNode, ParameterWatcher, Type, Value, };
+use rosrustext_rosrs::builders::NodeBuilderExt;
 
-// Pure logic library (shared with publisher)
 use lesson_05_logic::{StreamEvent, TelemetryStreamValidator};
+use lesson_interfaces::msg::MsgCount;
+use utils_rclrs::{qos, topics};
+use utils_rclrs::IntoRclrsError;
 
 const NODE_NAME: &str = "lesson_05_subscriber";
 const RESET_MAX_PARAM: &str = "reset_max_value";
 
-/// Hotfix:
-/// rclrs v0.6.x does not expose on-set parameter callbacks.
-/// Until that lands (or rosrustext bridges it), we poll parameters at a fixed rate.
+/// Subscriber component encapsulating the ROS subscription and validation logic.
 ///
-/// NOTE: polling is control-plane only; data-plane remains event-driven.
-const PARAM_POLL_PERIOD: Duration = Duration::from_secs(1);
-
-/// Encapsulates the subscription and its stream-validation logic.
-///
-/// Thread-safety: shared between the subscription callback (data plane) and the
-/// parameter polling loop (control plane), so the validator is protected by a Mutex.
+/// The component is created once at startup and lives for the life of the process.
+/// It is passive: it owns the subscription and validation state but does not manage
+/// parameters or configuration logic.
 struct SubscriberComponent {
     _sub: rclrs::Subscription<MsgCount>,
     validator: Arc<Mutex<TelemetryStreamValidator>>,
-    _logger: Logger, // RAII keep-alive
 }
 
 impl SubscriberComponent {
-    fn new(node: &Node, reset_max_value: i64) -> Result<Self, RclrsError> {
+    /// Creates and configures the subscriber component.
+    ///
+    /// The subscription callback validates incoming messages and emits
+    /// classification events via logging.
+    fn new(node: &Node, initial_reset_max: i64) -> Result<Self, RclrsError> {
         let logger = node.logger().clone();
 
-        // Topic/QoS are centralized (same pattern as publisher).
         let topic_name = topics::telemetry(node);
         let qos_profile = qos::telemetry(node);
 
-        // Shared validator state (updated in-place via polling loop).
-        let validator = Arc::new(Mutex::new(TelemetryStreamValidator::new(reset_max_value)));
+        let validator = Arc::new(Mutex::new(TelemetryStreamValidator::new(initial_reset_max)));
+        let validator_cb = Arc::clone(&validator);
 
-        // Use explicit options to keep the “production pattern” consistent with other lessons.
-        let mut options = rclrs::SubscriptionOptions::new(topic_name.as_str());
-        options.qos = qos_profile;
-
-        let sub = Self::create_subscription(node, options, logger.clone(), Arc::clone(&validator))?;
-
-        Ok(Self { _sub: sub, validator, _logger: logger })
-    }
-
-    fn create_subscription( node: &Node, options: rclrs::SubscriptionOptions, logger: Logger, 
-        validator: Arc<Mutex<TelemetryStreamValidator>>, ) -> Result<rclrs::Subscription<MsgCount>, RclrsError> {
-        node.create_subscription::<MsgCount, _>(options, move |msg: MsgCount| {
-            // Lock validator to ensure correctness during concurrent control-plane updates.
-            let mut v = match validator.lock() {
-                Ok(g) => g,
-                Err(_) => return, // poisoned: drop sample and continue
-            };
-
+        let sub = node.subscription::<MsgCount>(&topic_name).qos(qos_profile).callback(move |msg| {
+            let Ok(mut v) = validator_cb.lock() else { return; };
             Self::on_msg(&logger, &mut v, &msg);
-        })
+        }).create()?;
+
+        log_info!(node.logger(), "Component configured: subscriber on '{}'", topic_name);
+
+        Ok(Self { _sub: sub, validator })
     }
 
+    /// Handles a received message by delegating to the stream validator
+    /// and emitting an appropriate log entry.
     fn on_msg(logger: &Logger, v: &mut TelemetryStreamValidator, msg: &MsgCount) {
         let decision = v.on_count(msg.count);
-
         match decision.event {
             StreamEvent::Reset | StreamEvent::OutOfOrder => log_warn!(logger, "{}", decision.message),
             StreamEvent::Valid => log_info!(logger, "{}", decision.message),
@@ -76,107 +58,146 @@ impl SubscriberComponent {
     }
 }
 
-/// Resource Container: owns lifecycle, configuration, and the control-plane polling resource.
-///
-/// This node demonstrates "in-place update" behaviour: we mutate the validator behind a
-/// Mutex when the parameter changes (subscription remains stable).
-struct Lesson05SubscriberNode {
-    pub node: Node,
-    _subscriber_component: Arc<SubscriberComponent>,
-
-    // Hotfix polling timer keep-alive.
-    _param_poll_timer: rclrs::Timer,
+/// Container for mutable resources that change at runtime.
+#[derive(Default)]
+struct ResourceState {
+    last_reset_max: i64,
 }
 
-/// Small context object captured by the polling timer closure.
-struct ParamPollCtx {
-    validator: Arc<Mutex<TelemetryStreamValidator>>,
-    reset_param: rclrs::MandatoryParameter<i64>,
-    last_reset_max: AtomicI64,
+/// Parameter-driven subscriber node.
+///
+/// Uses rosrustext's ParameterWatcher to apply runtime updates to the validator
+/// without polling or lifecycle management.
+struct Lesson05SubscriberNode {
+    /// Shared node handle. Required because rosrustext ParameterNode binds to Arc<Node>.
+    node: Arc<Node>,
+
+    _component: Arc<SubscriberComponent>,
+
+    /// Mutable state updated by parameter change callbacks.
+    _state: Arc<Mutex<ResourceState>>,
+
+    /// Parameter plumbing and watcher keep-alives.
+    _params: ParameterNode,
+    _watcher: ParameterWatcher,
 }
 
 impl Lesson05SubscriberNode {
     pub fn new(executor: &Executor) -> Result<Self, RclrsError> {
-        let node = executor.create_node(NODE_NAME)?;
+        let node = Arc::new(executor.create_node(NODE_NAME)?);
         let logger = node.logger().clone();
 
-        // 1) Declare parameter once and keep a handle for polling.
-        //
-        // This is the rclrs-friendly equivalent of "declare if missing, otherwise get".
-        let reset_param = utils::declare_parameter(&node, RESET_MAX_PARAM, 1_i64)?;
+        let params = ParameterNode::try_new(Arc::clone(&node)).rcl_generic()?;
 
-        // 2) Read + sanitise initial value (robust and boring).
-        let mut initial_reset_max: i64 = reset_param.get();
-        if initial_reset_max < 0 {
-            log_error!( &logger, "Invalid initial {}='{}' (must be >= 0). Defaulting to 0.", RESET_MAX_PARAM, initial_reset_max );
-            initial_reset_max = 0;
-        }
+        let initial_val = Self::_declare_parameters(&params, &logger);
+        let initial_reset_max = initial_val.max(0);
 
-        // 3) Build subscriber component (owns subscription + validator state).
-        let sub = Arc::new(SubscriberComponent::new(&node, initial_reset_max)?);
+        let component = Arc::new(SubscriberComponent::new(node.as_ref(), initial_reset_max)?);
 
-        // 4) Hotfix adapter: poll the reset parameter and apply updates when it changes.
-        let param_poll_timer = Self::_create_param_timer( &node, Arc::clone(&sub.validator), reset_param, initial_reset_max )?;
+        let state = Arc::new(Mutex::new(ResourceState {
+            last_reset_max: initial_reset_max,
+        }));
+
+        let watcher = ParameterWatcher::new(&params).rcl_generic()?;
+
+        let node_clone = Arc::clone(&node);
+        let state_clone = Arc::clone(&state);
+        let comp_clone = Arc::clone(&component);
+
+        watcher.on_change(RESET_MAX_PARAM, move |change| {
+            Self::_on_param_change(&node_clone, &state_clone, &comp_clone, change);
+        });
 
         log_info!(&logger, "Lesson 05 Subscriber started.");
-        Ok(Self { node, _subscriber_component: sub, _param_poll_timer: param_poll_timer })
+
+        Ok(Self { node, _component : component, _state : state, _params: params, _watcher: watcher, })
     }
 
-    fn _create_param_timer( node: &Node, validator: Arc<Mutex<TelemetryStreamValidator>>, 
-        reset_param: rclrs::MandatoryParameter<i64>, initial_reset_max: i64 ) -> Result<rclrs::Timer, RclrsError> {
-        // Avoid "move out of node because it is borrowed" by using one clone for the call
-        // and another clone for the closure.
-        let node_for_timer = node.clone();
-        let node_for_cb = node.clone();
-
-        let ctx = Arc::new(ParamPollCtx { validator, reset_param, last_reset_max: AtomicI64::new(initial_reset_max) });
-
-        node_for_timer.create_timer_repeating(PARAM_POLL_PERIOD, move || {
-            Self::_check_param(&node_for_cb, &ctx);
-        })
-    }
-
-    fn _check_param(node: &Node, ctx: &ParamPollCtx) {
-        let current = ctx.reset_param.get();
-
-        // Fast-path: no change.
-        let last = ctx.last_reset_max.load(Ordering::Relaxed);
-        if current == last {
-            return;
-        }
-
-        // Validate before applying. If invalid, keep the last good configuration.
-        if let Err(reason) = Self::on_param_change(node, &ctx.validator, current) {
-            log_error!( node.logger(), "Ignoring update {}='{}': {}", RESET_MAX_PARAM, current, reason );
-            return;
-        }
-
-        ctx.last_reset_max.store(current, Ordering::Relaxed);
-    }
-
-    /// Callback-shaped handler: validate + apply a new reset tolerance.
+    /// Declares parameters and retrieves the initial reset tolerance.
     ///
-    /// Written as if it were called by a real on-set-parameters callback.
-    /// The hotfix polling loop calls this when it detects a change.
-    fn on_param_change( node: &Node, validator: &Arc<Mutex<TelemetryStreamValidator>>, new_reset_max: i64, ) -> Result<(), &'static str> {
-        if new_reset_max < 0 {
-            return Err("must be >= 0");
-        }
-
-        let mut v = match validator.lock() {
-            Ok(g) => g,
-            Err(_) => return Err("validator state unavailable"),
+    /// Mirrors the Lesson 06 `_declare_parameters` pattern.
+    fn _declare_parameters(params: &ParameterNode, logger: &Logger) -> i64 {
+        let desc = Descriptor {
+            description: "Maximum tolerated backward counter jump".to_string(),
+            ..Descriptor::default()
         };
 
-        v.set_reset_max_value(new_reset_max);
-        log_info!(node.logger(), "Updated {} -> {}", RESET_MAX_PARAM, new_reset_max);
-        Ok(())
+        if let Err(e) = params.declare(RESET_MAX_PARAM, Type::Integer, Value::Integer(1), desc) {
+            log_error!(logger, "Parameter declaration failed: {}. Using default.", e);
+            return 1;
+        }
+
+        let keys = [RESET_MAX_PARAM.to_string()];
+        let store_arc = params.store();
+        let store = store_arc.lock().unwrap();
+
+        store
+            .get(&keys)
+            .first()
+            .and_then(|v| match v {
+                Value::Integer(i) => Some(*i),
+                _ => None,
+            })
+            .unwrap_or(1)
+    }
+
+    /// Validates a parameter change event and applies it if required.
+    ///
+    /// This function performs:
+    /// - name filtering
+    /// - type validation
+    /// - semantic validation
+    /// - "no-op" detection
+    ///
+    /// If the update is valid and changes effective configuration, it delegates to
+    /// `_on_param_update`.
+    fn _on_param_change(node: &Arc<Node>, state: &Arc<Mutex<ResourceState>>, comp: &Arc<SubscriberComponent>, change: &ParameterChange,) {
+        if change.name != RESET_MAX_PARAM {
+            return;
+        }
+
+        let Value::Integer(new_val) = &change.new_value else {
+            log_warn!(node.logger(), "Ignoring {} update: non-integer value", RESET_MAX_PARAM);
+            return;
+        };
+        let new_val = *new_val;
+
+        if new_val < 0 {
+            log_warn!(node.logger(), "Ignoring {} update: value must be non-negative", RESET_MAX_PARAM);
+            return;
+        }
+
+        Self::_on_param_update(node, state, comp, new_val);
+    }
+
+    /// Applies a validated parameter update to the active component.
+    fn _on_param_update(node: &Arc<Node>, state: &Arc<Mutex<ResourceState>>, comp: &Arc<SubscriberComponent>, new_val: i64,) {
+        let mut guard = match state.lock() {
+            Ok(g) => g,
+            Err(_) => return,
+        };
+
+        // No-op detection: if the value hasn't changed, do nothing.
+        if guard.last_reset_max == new_val { return; }
+
+        // Update validator in place.
+        match comp.validator.lock() {
+            Ok(mut v) => {
+                v.set_reset_max_value(new_val);
+                guard.last_reset_max = new_val;
+                log_info!(node.logger(), "Updated {} -> {}", RESET_MAX_PARAM, new_val);
+            }
+            Err(_) => {
+                log_error!(node.logger(), "Failed to lock validator");
+            }
+        }
     }
 }
 
 fn main() -> Result<(), RclrsError> {
     let context = Context::default_from_env()?;
     let mut executor = context.create_basic_executor();
+
     let node = Lesson05SubscriberNode::new(&executor)?;
 
     executor

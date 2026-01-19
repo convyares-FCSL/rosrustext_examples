@@ -50,6 +50,12 @@ fi
 
 prepare_rcl_overlay "$RCL_BRANCH"
 
+echo "--> Patching lifecycle_msgs to include rosidl_generator_rs build dependency..."
+LIFECYCLE_MSGS_PKG="$RCL_OVERLAY_DIR/lifecycle_msgs/package.xml"
+if ! grep -q "rosidl_generator_rs" "$LIFECYCLE_MSGS_PKG"; then
+    sed -i '/<buildtool_depend>rosidl_default_generators<\/buildtool_depend>/a \ \ <build_depend>rosidl_generator_rs</build_depend>' "$LIFECYCLE_MSGS_PKG"
+fi
+
 echo "--> Cleaning previous interface builds to force regeneration..."
 rm -rf "$SCRIPT_DIR/../../build/lesson_interfaces" "$SCRIPT_DIR/../../install/lesson_interfaces"
 rm -rf "$SCRIPT_DIR/../../build/rcl_interfaces" "$SCRIPT_DIR/../../install/rcl_interfaces"
@@ -58,6 +64,7 @@ rm -rf "$SCRIPT_DIR/../../build/rosidl_generator_rs" "$SCRIPT_DIR/../../install/
 INTERFACE_PACKAGES=(
     rosidl_generator_rs
     builtin_interfaces
+    lifecycle_msgs
     service_msgs
     action_msgs
     unique_identifier_msgs
@@ -101,5 +108,10 @@ validate_generated_cargo \
     "rcl_interfaces" \
     "$SCRIPT_DIR/../../install/rcl_interfaces/share/rcl_interfaces/rust/Cargo.toml" \
     "Ensure rcl_interfaces/package.xml adds rosidl_generator_rs, the overlay was built (colcon includes rcl_interfaces), and the overlay branch matches ROS_DISTRO."
+
+validate_generated_cargo \
+    "lifecycle_msgs" \
+    "$SCRIPT_DIR/../../install/lifecycle_msgs/share/lifecycle_msgs/rust/Cargo.toml" \
+    "Ensure lifecycle_msgs is in the INTERFACE_PACKAGES list in this script and that the overlay exists in src/4_interfaces/rcl_interfaces/lifecycle_msgs."
 
 echo "Interfaces built."

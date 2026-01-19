@@ -70,7 +70,7 @@ Terminal 2:
 
 ```bash
 source ~/ros2_ws_tutorial/install/setup.bash
-ros2 service call /compute_stats lesson_interfaces/srv/ComputeStats "{data: [10.0, 20.0, 30.0]}"
+ros2 service call /tutorial/compute_stats lesson_interfaces/srv/ComputeStats "{data: [10.0, 20.0, 30.0]}"
 ```
 
 Server logs:
@@ -116,7 +116,7 @@ Expected output:
 ros2 service list -t
 ```
 
-Verify `/compute_stats` is listed with type `lesson_interfaces/srv/ComputeStats`.
+Verify `/tutorial/compute_stats` is listed with type `lesson_interfaces/srv/ComputeStats`.
 
 ---
 

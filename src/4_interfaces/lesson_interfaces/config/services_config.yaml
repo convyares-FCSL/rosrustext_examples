@@ -1,4 +1,4 @@
 /**:
   ros__parameters:
     services:
-      compute_stats: "/compute_stats"
+      compute_stats: "/tutorial/compute_stats"

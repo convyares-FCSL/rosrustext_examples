@@ -23,9 +23,12 @@ scripts/
 │   ├── build_cpp.sh              # Step 3: Build all C++ lessons
 │   ├── build_rclrs.sh            # Step 3: Build all Native Rust lessons
 │   └── build_rcllibrust.sh       # Step 3: Build all Bridge Rust lessons
-├── build_all.sh                  # Master script: Runs everything in order
+├── 04_tests/
+│   └── run_tests.py              # Test runner logic (Python, C++, Rust)
+├── build_all.sh                  # Master script: Runs builds in order
 ├── clean_all.sh                  # Helper: Cleans build/, install/, and target/
-└── env_setup.sh                  # Helper: Sanitizes environment variables to suppress warnings
+├── env_setup.sh                  # Helper: Sanitizes environment variables
+└── test_all.sh                   # Master script: Runs automated verification
 ```
 
 ---
@@ -138,3 +141,22 @@ They encode:
 * a clean separation between *infrastructure* and *lessons*
 
 If a script feels “strict”, that is intentional — it prevents silent divergence between Python, C++, and Rust tracks.
+
+---
+
+## Automated Verification
+
+You can run automated tests to verify that built lessons behave correctly. 
+
+### Run All Tests
+```bash
+./scripts/04_tests/run_all.sh
+```
+
+This script:
+1. Sources the workspace and environment.
+2. Runs individual track suites (`run_python.sh`, `run_cpp.sh`, `run_rclrs.sh`).
+3. Uses a shared hygiene helper (`scripts/05_utils/test_helpers.sh`) to ensure no residue is left between tracks.
+4. Prints a final summary table of all tracks.
+
+**Note:** Tests cover Lessons 01-06. Logs are written to `log/tests/<track>/`.

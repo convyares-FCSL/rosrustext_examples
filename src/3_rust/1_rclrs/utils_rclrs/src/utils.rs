@@ -1,11 +1,11 @@
 use rclrs::{DeclarationError, MandatoryParameter, Node, ParameterVariant};
 use std::fmt::Debug;
 
-/// Declare a parameter (or reuse existing declaration) and return a typed handle.
+/// Declares a parameter (or reuses an existing declaration) and returns a typed handle.
 ///
-/// ROS 2 merges parameter overrides (YAML/CLI) before node creation, so `param.get()`
-/// always returns the effective value. We do **not** try to guess whether it came
-/// from YAML vs default (that’s not reliably inferable).
+/// ROS 2 applies parameter overrides (YAML / CLI) before node creation, therefore
+/// `param.get()` always reflects the effective runtime value.
+/// The origin of the value (default vs override) is not inferred.
 pub fn declare_parameter<T>(
     node: &Node,
     name: &str,
@@ -19,9 +19,43 @@ where
         .default(default_value)
         .mandatory()?;
 
-    // Optional: log effective value once at startup (boring, truthful).
-    // let value: T = param.get();
-    // rclrs::log_info!(node.logger(), "[config] {} = {:?}", name, value);
-
     Ok(param)
+}
+
+// -----------------------------------------------------------------------------
+// RclrsError helpers
+// -----------------------------------------------------------------------------
+
+use rclrs::{RclReturnCode, RclrsError};
+
+/// Constructs an `RclrsError::RclError` with the provided return code.
+///
+/// This centralizes error construction policy and avoids repetition at call sites.
+pub fn rcl_error(code: RclReturnCode) -> RclrsError {
+    RclrsError::RclError { code, msg: None }
+}
+
+/// Constructs a generic RCL error using `RclReturnCode::Error`.
+pub fn rcl_error_generic() -> RclrsError {
+    rcl_error(RclReturnCode::Error)
+}
+
+/// Extension trait providing ergonomic conversion from `Result<T, E>`
+/// into `Result<T, RclrsError>`.
+///
+/// This is intended for mapping rclrs API failures where the original
+/// error type is not propagated.
+pub trait IntoRclrsError<T> {
+    fn rcl(self, code: RclReturnCode) -> Result<T, RclrsError>;
+    fn rcl_generic(self) -> Result<T, RclrsError>;
+}
+
+impl<T, E> IntoRclrsError<T> for Result<T, E> {
+    fn rcl(self, code: RclReturnCode) -> Result<T, RclrsError> {
+        self.map_err(|_| rcl_error(code))
+    }
+
+    fn rcl_generic(self) -> Result<T, RclrsError> {
+        self.rcl(RclReturnCode::Error)
+    }
 }

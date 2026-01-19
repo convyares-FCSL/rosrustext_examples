@@ -2,7 +2,7 @@
 
 ## Goal
 Create a node that:
-- publishes a custom message (increasing integer) on the `chatter` topic
+- publishes a custom message (increasing integer) on the `/tutorial/chatter` topic
 - uses shared configuration for topic name and QoS (loaded from `src/1_python/utils_py/config`)
 - supports a parameter to control the publish rate
 - shuts down cleanly on Ctrl+C
@@ -42,7 +42,7 @@ Since the node publishes silently, use these commands in another terminal to ver
 ### 1. View published messages
 See the data flowing in real-time. You should see the custom integer message incrementing:
 ```bash
-ros2 topic echo /chatter
+ros2 topic echo /tutorial/chatter
 ```
 
 ### 2. Inspect message structure
@@ -55,7 +55,7 @@ ros2 interface show lesson_interfaces/msg/MsgCount
 ### 3. Check publisher details
 Verify the node is publishing with the correct QoS settings (Reliability, Durability, etc.):
 ```bash
-ros2 topic info -v /chatter
+ros2 topic info -v /tutorial/chatter
 ```
 Look for `Node name: lesson_02_node` and verify the QoS profile matches `qos_config.yaml`.
 

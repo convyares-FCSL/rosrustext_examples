@@ -4,4 +4,4 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rclrs = { git = "https://github.com/ros2-rust/ros2_rust", tag = "v0.6.0", package = "rclrs" }
+rclrs = "0.6"

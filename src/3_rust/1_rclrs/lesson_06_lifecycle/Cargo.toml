@@ -1,0 +1,33 @@
+[package]
+name = "lesson_06_lifecycle_rclrs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# ROS 2 Client Library
+rclrs = "0.6"
+
+# Lifecycle Adapter (Published)
+# We enable "bond" to allow Nav 2 to use the lifecycle adapter
+rosrustext_rosrs = { version = "0.4.1", features = ["ros2", "bond"] }
+
+# Utilities
+anyhow = "1.0"
+utils_rclrs = { path = "../utils_rclrs" }
+
+# Message Interfaces (Locally Generated)
+lesson_interfaces = { path = "../../../../install/lesson_interfaces/share/lesson_interfaces/rust" }
+lifecycle_msgs = { path = "../../../../install/lifecycle_msgs/share/lifecycle_msgs/rust" }
+rcl_interfaces = { path = "../../../../install/rcl_interfaces/share/rcl_interfaces/rust" }
+
+[lib]
+name = "lesson_06_logic"
+path = "src/lib.rs"
+
+[[bin]]
+name = "lesson_06_lifecycle_publisher"
+path = "src/bin/lesson_06_lifecycle_publisher.rs"
+
+[[bin]]
+name = "lesson_06_lifecycle_subscriber"
+path = "src/bin/lesson_06_lifecycle_subscriber.rs"

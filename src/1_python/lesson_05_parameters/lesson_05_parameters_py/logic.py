@@ -1,9 +1,29 @@
-from __future__ import annotations
-
+"""
+Pure Business Logic (No ROS dependencies).
+"""
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
+
+# --- Publisher Logic ---
+
+class TelemetryGenerator:
+    """
+    Manages the internal state for the telemetry stream.
+    """
+    __slots__ = ("_count",)
+
+    def __init__(self) -> None:
+        self._count = 0
+
+    def next_value(self) -> int:
+        """Produce the next value in the sequence."""
+        current = self._count
+        self._count += 1
+        return current
+
+
+# --- Subscriber Logic ---
 
 class StreamEvent(str, Enum):
     INITIAL = "initial"
@@ -23,12 +43,6 @@ class StreamDecision:
 class TelemetryStreamValidator:
     """
     Validates a monotonically increasing counter stream with reset tolerance.
-
-    Policy:
-      - First message initializes expected.
-      - If count drops to a small value (<= reset_max_value) and is < expected -> treat as reset.
-      - If count < expected (and not a reset) -> out-of-order/stale sample.
-      - Otherwise accept and advance expected.
     """
 
     __slots__ = ("_initialized", "_expected", "_reset_max_value")
@@ -37,14 +51,6 @@ class TelemetryStreamValidator:
         self._initialized = False
         self._expected = 0
         self._reset_max_value = int(reset_max_value)
-
-    @property
-    def expected(self) -> int:
-        return self._expected
-
-    @property
-    def reset_max_value(self) -> int:
-        return self._reset_max_value
 
     def set_reset_max_value(self, value: int) -> None:
         self._reset_max_value = int(value)

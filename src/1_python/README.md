@@ -115,3 +115,9 @@ You just need Lesson 05 added in the same style and abstraction level as 00–04
 
 6. **Lesson 05**: Parameters & Central Configuration
    Central YAML-driven configuration, parameter declaration and validation via `utils_py`, runtime updates with callbacks, and safe behavioural mutation without node restart.
+
+7. **Lesson 06**: Lifecycle Management
+   Managed nodes (`Unconfigured` → `Inactive` → `Active`), manual gating of data flow, and standard administrative interfaces.
+
+8. **Lesson 06 (Orchestration)**: Lifecycle Manager
+   Deterministic startup and shutdown sequences using a dedicated manager node (`lifecycle_manager`) to control multiple lifecycle nodes.

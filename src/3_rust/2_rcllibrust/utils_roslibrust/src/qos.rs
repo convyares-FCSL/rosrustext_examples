@@ -65,7 +65,7 @@ pub fn load_profile(cfg: &Config, profile_name: &str) -> AdvertiseOptions {
 
     // 1. Fetch values from Config (YAML) or use defaults
     // Note: roslibrust Config.get_or works for individual fields
-    let reliability: String = cfg.get_or(&format!("{}.reliability", base), defaults.reliability);
+    let _reliability: String = cfg.get_or(&format!("{}.reliability", base), defaults.reliability);
     let durability: String = cfg.get_or(&format!("{}.durability", base), defaults.durability);
     let depth: u32 = cfg.get_or(&format!("{}.depth", base), defaults.depth);
 

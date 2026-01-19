@@ -185,16 +185,23 @@ Centralise system configuration while keeping node code explicit and determinist
 
 ---
 
-### Lesson 06 – Lifecycle Publisher (Planned)
+### Lesson 06 – Lifecycle Management (Managed Nodes)
 
 **Goal**
-Introduce managed nodes.
+Establish the "Managed Node" pattern where nodes wait for orchestration rather than starting immediately.
 
 **Focus**
-Lifecycle transitions, controlled activation.
+The ROS 2 Lifecycle State Machine (Unconfigured  Inactive  Active).
+
+* **Deterministic Startup**: Orchestrating a fleet using a Manager Node.
+* **Gated Execution**: Publishers and timers that are silent unless `Active`.
+* **Verification**: Automated integration testing (`launch_testing`) and standard compliance check (Nav2).
 
 **Architecture**
-Resources created on `configure`, activated explicitly, destroyed cleanly.
+
+* **State Ownership**: Native inheritance (`rclpy`/`rclcpp`) or `rosrustext` adapters (Rust).
+* **Gated Resources**: LifecyclePublishers and LifecycleTimers used to enforce state contracts.
+* **Orchestration Layer**: A dedicated package containing a Custom Manager Node and Integration Test suite.
 
 ---
 
@@ -224,7 +231,21 @@ Controlled concurrency instead of implicit threading.
 
 ---
 
-### Lesson 09 – Launch & Configuration Discovery (Planned)
+### Lesson 09 – Composition (Planned)
+
+**Goal**
+ 
+
+**Focus**
+Node composition.
+
+**Architecture**
+No hardcoded paths; runtime discovery only.
+
+
+---
+
+### Lesson 10 – Launch & Configuration Discovery (Planned)
 
 **Goal**
 Production-grade startup.
@@ -234,6 +255,38 @@ Launch files, installed vs source-tree configuration.
 
 **Architecture**
 No hardcoded paths; runtime discovery only.
+
+---
+
+---
+
+## Testing
+
+This workspace includes a robust testing suite for Python, C++, and Rust (`rclrs`) tracks. The tests verify node functionality, communication (pub/sub/service), parameter handling, and lifecycle orchestration.
+
+### Track Commands
+
+You can run tests for a specific track or all tracks at once:
+
+| Track | Command |
+|-------|---------|
+| **All Tracks** | `./scripts/04_tests/run_all.sh` |
+| Python | `./scripts/04_tests/run_python.sh` |
+| C++ | `./scripts/04_tests/run_cpp.sh` |
+| Rust (rclrs) | `./scripts/04_tests/run_rclrs.sh` |
+
+### Logs & Interpretation
+
+Test logs are stored in `log/tests/`, grouped by track (e.g., `log/tests/python/`). 
+A **PASS** indicates the node output matches the expected pattern (regex) or the logic verification succeeded.
+
+### Test Hygiene & "Ghost Nodes"
+
+The suite implements a strict hygiene mechanism to ensure clean runs:
+- **Process Groups**: Every node is launched in a dedicated process group (`setsid -w`).
+- **Traps**: Scripts use bash traps to ensure all processes are terminated (SIGTERM followed by SIGKILL) on exit, failure, or interruption (Ctrl+C).
+- **Graph & Residue Check**: Scripts verify the ROS graph is sterile between runs.
+- **Daemon Flushing**: If a "ghost node" (a node visible in the graph whose process has actually terminated) is detected, the script automatically restarts the `ros2 daemon` to flush the cache.
 
 ---
 
