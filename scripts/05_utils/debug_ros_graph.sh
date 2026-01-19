@@ -66,7 +66,7 @@ echo
 echo "----------------------------------------"
 echo " OS-level ROS Processes"
 echo "----------------------------------------"
-ps aux | grep -E "lesson_|ros2 run" | grep -v grep || echo "No ROS lesson processes running"
+ps aux | grep -E "lesson_|ros2 run|rosrustext_lifecycle_proxy|rosbridge" | grep -v grep || echo "No ROS lesson processes running"
 
 echo
 echo "========================================"

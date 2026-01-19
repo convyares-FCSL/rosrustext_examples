@@ -1,5 +1,3 @@
-pub mod lifecycle;
-
 use serde::{Deserialize, Serialize};
 use roslibrust::RosMessageType;
 

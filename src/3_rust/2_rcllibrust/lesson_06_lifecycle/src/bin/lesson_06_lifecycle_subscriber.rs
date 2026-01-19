@@ -1,210 +1,240 @@
 use std::sync::{Arc, Mutex};
-use roslibrust::rosbridge::ClientHandle;
-use tokio_util::sync::CancellationToken;
-use lesson_06_lifecycle_roslibrust::lifecycle::*;
-use lesson_06_lifecycle_roslibrust::*;
+use roslibrust::rosbridge::{ClientHandle, Subscriber};
+use rosrustext_roslibrust::lifecycle::{LifecycleCallbacks, LifecycleNode, CallbackResult};
+use rosrustext_roslibrust::transport::roslibrust::register_lifecycle_backend_rosbridge;
+use lesson_06_lifecycle_roslibrust::{MsgCount, TelemetryStreamValidator, StreamEvent};
 use utils_roslibrust::utils::{Config, parse_params_files_from_args};
 use utils_roslibrust::topics;
-use futures::StreamExt; // For .next()
+use tokio::sync::mpsc;
 
 const NODE_NAME: &str = "lesson_06_lifecycle_subscriber";
 const VALIDATOR_RESET_LIMIT_PARAM: &str = "validator_reset_limit";
 const DEFAULT_RESET_LIMIT: i64 = 5;
 
-struct SubscriberResources {
-    // We control the subscription task via a token
-    sub_token: Option<CancellationToken>,
+// --- Architecture Definitions ---
+
+#[derive(Debug)]
+enum LifecycleCommand {
+    Configure { topic: String, reset_limit: i64 },
+    Activate,
+    Deactivate,
+    Cleanup,
+    Shutdown,
+}
+
+struct SubscriberNode {
+    cmd_tx: mpsc::Sender<LifecycleCommand>,
+    topic_name: String,
+    initial_reset_limit: i64,
+}
+
+impl SubscriberNode {
+    fn send_command(&self, cmd: LifecycleCommand) -> CallbackResult {
+        // Non-blocking send.
+        match self.cmd_tx.try_send(cmd) {
+            Ok(_) => CallbackResult::Success,
+            Err(e) => {
+                log::error!("Failed to enqueue lifecycle command: {}", e);
+                CallbackResult::Failure
+            }
+        }
+    }
+}
+
+impl LifecycleCallbacks for SubscriberNode {
+    fn on_configure(&mut self) -> CallbackResult {
+        log::info!("on_configure: Queuing Configure command...");
+        self.send_command(LifecycleCommand::Configure { 
+            topic: self.topic_name.clone(), 
+            reset_limit: self.initial_reset_limit 
+        })
+    }
+
+    fn on_activate(&mut self) -> CallbackResult {
+        log::info!("on_activate: Queuing Activate command...");
+        self.send_command(LifecycleCommand::Activate)
+    }
+
+    fn on_deactivate(&mut self) -> CallbackResult {
+        log::info!("on_deactivate: Queuing Deactivate command...");
+        self.send_command(LifecycleCommand::Deactivate)
+    }
+
+    fn on_cleanup(&mut self) -> CallbackResult {
+        log::info!("on_cleanup: Queuing Cleanup command...");
+        self.send_command(LifecycleCommand::Cleanup)
+    }
+
+    fn on_shutdown(&mut self) -> CallbackResult {
+        log::info!("on_shutdown: Queuing Shutdown command...");
+        self.send_command(LifecycleCommand::Shutdown)
+    }
+
+    fn on_error(&mut self) -> CallbackResult {
+        log::error!("Lifecycle error occurred!");
+        CallbackResult::Failure
+    }
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
     
-    // Config
+    // Configuration
     let param_files = parse_params_files_from_args();
     let config = if !param_files.is_empty() {
         Config::from_files(&param_files).map_err(|e| format!("{:?}", e))?
     } else {
         Config::from_files(&[] as &[&str]).map_err(|e| format!("{:?}", e))?
-    };     
-
-    let client = ClientHandle::new("ws://localhost:9090").await?;
-    log::info!("Connected to rosbridge at ws://localhost:9090");
+    };
 
     let topic_name = topics::telemetry(&config);
     let initial_reset_limit = config.get_or(VALIDATOR_RESET_LIMIT_PARAM, DEFAULT_RESET_LIMIT);
 
-    // State
-    let lifecycle_state = Arc::new(Mutex::new(LifecycleState::Unconfigured));
-    let resources = Arc::new(Mutex::new(SubscriberResources { sub_token: None }));
-    let validator = Arc::new(Mutex::new(TelemetryStreamValidator::new(initial_reset_limit)));
+    log::info!("Starting {} with topic={}, reset_limit={}", NODE_NAME, topic_name, initial_reset_limit);
 
-    // Parameter Watcher for 'validator_reset_limit'
-    let client_clone_param = client.clone();
-    let validator_clone_param = validator.clone();
-    tokio::spawn(async move {
-        match client_clone_param.subscribe::<ParameterEvent>("/parameter_events").await {
-            Ok(mut sub) => {
-                 loop {
-                     let event = sub.next().await;
-                     if event.node.ends_with(NODE_NAME) {
-                         for p in event.changed_parameters.iter().chain(event.new_parameters.iter()) {
-                             if p.name == VALIDATOR_RESET_LIMIT_PARAM {
-                                 if p.value.type_ == 2 { // Integer
-                                     let val = p.value.integer_value;
-                                     validator_clone_param.lock().unwrap().set_reset_max_value(val);
-                                     log::info!("Validator reset limit updated to {}", val);
-                                 }
-                             }
-                         }
-                     }
-                 }
-            }
-            Err(e) => log::warn!("Failed to subscribe to parameter events: {}", e),
-        }
-    });
+    // Connection
+    let client = ClientHandle::new("ws://localhost:9090").await?;
+    log::info!("Connected to rosbridge");
+    log::info!("Node started. Current state: Unconfigured");
 
-    // Lifecycle Services
+    // Channels
+    let (cmd_tx, mut cmd_rx) = mpsc::channel(32);
+
+    // Sync Node Implementation
+    let node_impl = SubscriberNode {
+        cmd_tx: cmd_tx.clone(),
+        topic_name: topic_name.clone(),
+        initial_reset_limit,
+    };
+
+    // Lifecycle Shim
+    let lifecycle_node = Arc::new(Mutex::new(LifecycleNode::new(NODE_NAME, Box::new(node_impl))?));
+    register_lifecycle_backend_rosbridge(&client, NODE_NAME, Arc::clone(&lifecycle_node)).await?;
+    // Note: Subscriber gating is implicitly handled by creation/destruction of the subscription.
     
-    // GET STATE
-    let state_clone_get = lifecycle_state.clone();
-    let get_topic = format!("{}/get_state", NODE_NAME);
-    let _srv_get = client.advertise_service::<GetState, _>(
-        &get_topic,
-        move |_| {
-            let s = *state_clone_get.lock().unwrap();
-            Ok(GetStateResponse { current_state: s.to_msg() })
-        }
-    ).await?;
-    log::info!("Service advertised: {}", get_topic);
+    // Async Engine Task
+    let engine_handle = tokio::spawn(async move {
+        // Resources
+        let mut subscription: Option<Subscriber<MsgCount>> = None;
+        let mut validator = TelemetryStreamValidator::new(initial_reset_limit);
+        
+        // State
+        // State
+        let mut target_topic = String::new();
+        let mut stored_reset_limit = initial_reset_limit;
 
-    // CHANGE STATE
-    let state_clone_change = lifecycle_state.clone();
-    let resources_clone_change = resources.clone();
-    let client_clone_change = client.clone();
-    let validator_clone_sub = validator.clone();
-    let change_topic = format!("{}/change_state", NODE_NAME);
-    let topic_name_clone = topic_name.clone();
+        log::info!("Async Engine started.");
 
-    let _srv_change = client.advertise_service::<ChangeState, _>(
-        &change_topic,
-        move |req| {
-            let transition_id = req.transition.id;
-            let mut current_state = state_clone_change.lock().unwrap();
-            let mut success = false;
-
-            match (current_state.clone(), transition_id) {
-                (LifecycleState::Unconfigured, TRANSITION_CONFIGURE) => {
-                    // Start Subscription Task
-                    let token = CancellationToken::new();
-                    let token_clone = token.clone();
-                    let client_c = client_clone_change.clone();
-                    let topic_n = topic_name_clone.clone();
-                    let valid_c = validator_clone_sub.clone();
-                    let state_c = state_clone_change.clone();
-
-                    tokio::spawn(async move {
-                        let mut sub = match client_c.subscribe::<MsgCount>(&topic_n).await {
-                            Ok(s) => s,
-                            Err(e) => {
-                                log::error!("Failed to subscribe: {}", e);
-                                return;
-                            }
-                        };
-                        
-                        loop {
-                            tokio::select! {
-                                _ = token_clone.cancelled() => {
-                                    return;
-                                }
-                                msg = sub.next() => {
-                                    // Gating logic
-                                    let s = *state_c.lock().unwrap();
-                                    if s == LifecycleState::Active {
-                                        let decision = valid_c.lock().unwrap().on_count(msg.count);
-                                        match decision.event {
-                                            StreamEvent::Valid => log::info!("[Valid] {}", decision.message),
-                                            StreamEvent::Reset => log::warn!("[Reset] {}", decision.message),
-                                            StreamEvent::OutOfOrder => log::error!("[OutOfOrder] {}", decision.message),
-                                        }
-                                    } else {
-                                        // Inactive
-                                    }
-                                }
-                            }
+        loop {
+            if let Some(sub) = &mut subscription {
+                tokio::select! {
+                    Some(cmd) = cmd_rx.recv() => {
+                         let keep_going = handle_sub_command(
+                            cmd, 
+                            &client, 
+                            &mut subscription, 
+                            &mut validator, 
+                            &mut target_topic,
+                            &mut stored_reset_limit
+                        ).await;
+                        if !keep_going { break; }
+                    }
+                    // subscriber::next() returns MsgCount directly (inherent method).
+                    // It does not implement Stream, so we cannot check for None.
+                    msg = sub.next() => {
+                        let decision = validator.on_count(msg.count);
+                        match decision.event {
+                            StreamEvent::Valid => log::info!("[Valid] {}", decision.message),
+                            StreamEvent::OutOfOrder => log::warn!("[OutOfOrder] {}", decision.message),
+                            StreamEvent::Reset => log::info!("[Reset] {}", decision.message),
                         }
-                    });
-
-                    resources_clone_change.lock().unwrap().sub_token = Some(token);
-                    *current_state = LifecycleState::Inactive;
-                    success = true;
-                },
-                (LifecycleState::Inactive, TRANSITION_ACTIVATE) => {
-                    *current_state = LifecycleState::Active;
-                    success = true;
-                },
-                (LifecycleState::Active, TRANSITION_DEACTIVATE) => {
-                    *current_state = LifecycleState::Inactive;
-                    success = true;
-                },
-                (LifecycleState::Inactive, TRANSITION_CLEANUP) => {
-                    if let Some(token) = resources_clone_change.lock().unwrap().sub_token.take() {
-                        token.cancel();
                     }
-                    *current_state = LifecycleState::Unconfigured;
-                    success = true;
-                },
-                 (LifecycleState::Unconfigured, TRANSITION_SHUTDOWN) |
-                 (LifecycleState::Inactive, TRANSITION_SHUTDOWN) |
-                 (LifecycleState::Active, TRANSITION_SHUTDOWN) => {
-                    if let Some(token) = resources_clone_change.lock().unwrap().sub_token.take() {
-                        token.cancel();
+                    else => { break; } 
+                }
+            } else {
+                match cmd_rx.recv().await {
+                    Some(cmd) => {
+                         let keep_going = handle_sub_command(
+                            cmd, 
+                            &client, 
+                            &mut subscription, 
+                            &mut validator, 
+                            &mut target_topic,
+                            &mut stored_reset_limit
+                        ).await;
+                        if !keep_going { break; }
                     }
-                    *current_state = LifecycleState::Finalized;
-                    success = true;
-                },
-                _ => {
-                    log::warn!("Invalid transition request");
-                    success = false;
+                    None => { break; }
                 }
             }
-
-            Ok(ChangeStateResponse { success })
         }
-    ).await?;
-    log::info!("Service advertised: {}", change_topic);
+        log::info!("Async Engine stopped.");
+    });
 
-    // SET PARAMETERS
-    let validator_clone_set = validator.clone();
-    let set_param_topic = format!("{}/set_parameters", NODE_NAME);
-    let _srv_set_param = client.advertise_service::<SetParameters, _>(
-        &set_param_topic,
-        move |req| {
-             let mut results = Vec::new();
-             for p in req.parameters {
-                 if p.name == VALIDATOR_RESET_LIMIT_PARAM {
-                     let mut success = false;
-                     let mut reason = "Invalid Type/Value".to_string();
-
-                     if p.value.type_ == 2 { // Integer
-                         let val = p.value.integer_value;
-                         validator_clone_set.lock().unwrap().set_reset_max_value(val);
-                         log::info!("SetParameters: Updated {} to {}", VALIDATOR_RESET_LIMIT_PARAM, val);
-                         success = true;
-                         reason = "".to_string();
-                     }
-                     results.push(SetParametersResult { successful: success, reason });
-                 } else {
-                     results.push(SetParametersResult { successful: true, reason: "Ignored unknown param".to_string() });
-                 }
-             }
-             Ok(SetParametersResponse { results })
+    // Deterministic Shutdown
+    match tokio::signal::ctrl_c().await {
+        Ok(()) => {
+             log::info!("Ctrl-C received. Initiating shutdown...");
+             let _ = cmd_tx.send(LifecycleCommand::Shutdown).await;
         }
-    ).await?;
-    log::info!("Service advertised: {}", set_param_topic);
+        Err(e) => log::error!("Signal error: {}", e),
+    }
 
-    log::info!("Node {} started. State: Unconfigured", NODE_NAME);
-
-    tokio::signal::ctrl_c().await?;
+    engine_handle.await?;
+    log::info!("Node exited cleanly.");
     Ok(())
+}
+
+/// Returns true if engine should continue, false if it should shut down.
+async fn handle_sub_command(
+    cmd: LifecycleCommand,
+    client: &ClientHandle,
+    subscription: &mut Option<Subscriber<MsgCount>>,
+    validator: &mut TelemetryStreamValidator,
+    target_topic: &mut String,
+    configured_reset_limit: &mut i64,
+) -> bool {
+    match cmd {
+        LifecycleCommand::Configure { topic, reset_limit } => {
+            log::info!("Engine: Configuring with topic={}, limit={}", topic, reset_limit);
+            *target_topic = topic;
+            *configured_reset_limit = reset_limit;
+            // Initialize validator with the configured limit
+            validator.set_reset_max_value(reset_limit);
+        }
+        LifecycleCommand::Activate => {
+             log::info!("Engine: Activating...");
+             if !target_topic.is_empty() {
+                 match client.subscribe::<MsgCount>(target_topic).await {
+                     Ok(sub) => {
+                         *subscription = Some(sub);
+                         log::info!("Engine: Subscribed to {}", target_topic);
+                     }
+                     Err(e) => log::error!("Engine: Failed to subscribe: {}", e),
+                 }
+             } else {
+                 log::error!("Engine: Activate called but no topic configured.");
+             }
+        }
+        LifecycleCommand::Deactivate => {
+            log::info!("Engine: Deactivating...");
+            *subscription = None; // Drops subscription, stops data flow
+        }
+        LifecycleCommand::Cleanup => {
+            log::info!("Engine: Cleaning up...");
+            *subscription = None;
+            // Reset validator to the configured limit to be ready for next cycle
+            validator.set_reset_max_value(*configured_reset_limit);
+            // Note: We keep target_topic and configured_reset_limit in engine state 
+            // even though we are "Unconfigured", effectively caching them. 
+            // A real Configure transition would overwrite them anyway.
+        }
+        LifecycleCommand::Shutdown => {
+            log::info!("Engine: Shutting down...");
+            *subscription = None;
+            return false;
+        }
+    }
+    true
 }
