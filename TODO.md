@@ -61,8 +61,8 @@ This file tracks the structural, pedagogical, and technical status of the ROS 2 
 | **03** | **Subscriber** | [X] | [X] | [X] | [X] | [X] |
 | **04** | **Services** | [X] | [X] | [X] | [X] | [X] |
 | **05** | **Parameters** | [X] | [X] | [X] | [X] | [X] |
-| **06** | **Lifecycle** | [X] | [X] | [X] | [X] | [ ] |
-| **06b** | **LifecycleManager** | [X] | [-] | [-] | [-] | [ ] |
+| **06** | **Lifecycle** | [X] | [X] | [X] | [X] | [X] |
+| **06b** | **LifecycleManager** | [X] | [X] | [X] | [X] | [X] |
 | **07** | **Actions** | [ ] | [ ] | [ ] | [ ] | [ ] |
 | **08** | **Executors** | [ ] | [ ] | [ ] | [ ] | [ ] |
 | **09** | **Composition** | [ ] | [ ] | [ ] | [ ] | [ ] |
