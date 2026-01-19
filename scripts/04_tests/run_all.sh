@@ -38,6 +38,7 @@ source "$PROJ_ROOT/scripts/env_setup.sh" > /dev/null 2>&1
 run_suite "Python" "$PROJ_ROOT/scripts/04_tests/run_python.sh"
 run_suite "C++" "$PROJ_ROOT/scripts/04_tests/run_cpp.sh"
 run_suite "Rust/rclrs" "$PROJ_ROOT/scripts/04_tests/run_rclrs.sh"
+run_suite "roslibrust" "$PROJ_ROOT/scripts/04_tests/run_roslibrust.sh"
 
 # Final Table
 echo -e "\n=================================================="
@@ -47,7 +48,7 @@ printf "%-20s | %s\n" "Track" "Status"
 echo "---------------------|----------"
 
 TOTAL_FAIL=0
-for track in "Python" "C++" "Rust/rclrs"; do
+for track in "Python" "C++" "Rust/rclrs" "roslibrust"; do
     status=${RESULTS[$track]}
     if [ "$status" == "PASS" ]; then
         printf "%-20s | \033[0;32m%-10s\033[0m\n" "$track" "$status"
