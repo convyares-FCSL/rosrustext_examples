@@ -19,39 +19,34 @@ The same lesson numbers exist for **Python**, **C++**, **rclrs**, and **roslibru
 
 ## Workspace Layout
 
+<details open>
+<summary>src/</summary>
+
 ```text
 src/
 ├─ 1_python/                 # Python lessons (rclpy)
 │   ├─ lesson_00_bootstrap
 │   ├─ lesson_01_node
-│   ├─ lesson_02_publisher
-│   ├─ lesson_03_subscriber
-│   ├─ lesson_04_service
+│   ├─ 
 │   └─ utils_py/
 │
 ├─ 2_cpp/                    # C++ lessons (rclcpp)
 │   ├─ lesson_00_bootstrap
 │   ├─ lesson_01_node
-│   ├─ lesson_02_publisher
-│   ├─ lesson_03_subscriber
-│   ├─ lesson_04_service
+│   ├─ 
 │   └─ utils_cpp/
 │
 ├─ 3_rust/
 │   ├─ 1_rclrs/              # Native Rust nodes (DDS, primary track)
 │   │   ├─ lesson_00_bootstrap
 │   │   ├─ lesson_01_node
-│   │   ├─ lesson_02_publisher
-│   │   ├─ lesson_03_subscriber
-│   │   ├─ lesson_04_service
+│   │   ├─ 
 │   │   └─ utils_rclrs/
 │   │
 │   └─ 2_rcllibrust/         # Rust via rosbridge (async / external clients)
 │       ├─ lesson_00_bootstrap
 │       ├─ lesson_01_node
-│       ├─ lesson_02_publisher
-│       ├─ lesson_03_subscriber
-│       ├─ lesson_04_service
+│       ├─ 
 │       └─ utils_rcllibrust/
 │
 ├─ 4_interfaces/
@@ -67,6 +62,8 @@ src/
 templates/                   # Starter boilerplate
 scripts/                     # Workspace automation
 ```
+
+</details>
 
 ---
 
@@ -86,7 +83,12 @@ This makes it possible to compare implementations directly while keeping the lea
 
 ## Lessons
 
-### Lesson 00 – Bootstrap
+<details open>
+  <summary style="font-size: 1.25em; font-weight: 600;">
+    Lesson 00 – Bootstrap :
+    <br />
+    <br />
+  </summary>
 
 **Goal**
 Create the smallest possible ROS-capable package per language.
@@ -97,9 +99,14 @@ Build systems (`colcon` vs `cargo`), environment setup, logging, clean shutdown.
 **Architecture**
 Node wrapped in a class/struct to enforce ownership, RAII, and predictable shutdown. No “naked scripts”.
 
----
+</details>
 
-### Lesson 01 – Event Loop
+<details>
+  <summary style="font-size: 1.25em; font-weight: 600;">
+    Lesson 01 – Event Loop :
+    <br />
+    <br />
+  </summary>
 
 **Goal**
 Introduce continuous execution.
@@ -110,9 +117,14 @@ Timers, parameters, safe state mutation.
 **Architecture**
 Explicit event loop with owned state (class members in Python/C++, struct fields in Rust).
 
----
+</details>
 
-### Lesson 02 – Publisher
+<details>
+  <summary style="font-size: 1.25em; font-weight: 600;">
+    Lesson 02 – Publisher :
+    <br />
+    <br />
+  </summary>
 
 **Goal**
 Publish a shared custom message across languages.
@@ -128,9 +140,14 @@ Separation between:
 
 Publishers become injected dependencies rather than global objects.
 
----
+</details>
 
-### Lesson 03 – Subscriber & System Verification
+<details>
+  <summary style="font-size: 1.25em; font-weight: 600;">
+    Lesson 03 – Subscriber & System Verification :
+    <br />
+    <br />
+  </summary>
 
 **Goal**
 Verify cross-language message flow and transport correctness.
@@ -146,9 +163,14 @@ Subscriber implemented as a **self-contained component**:
 
 This lesson treats the subscriber as a **verification tool**, not just a data consumer.
 
----
+</details>
 
-### Lesson 04 – Services & Unit Testing
+<details>
+  <summary style="font-size: 1.25em; font-weight: 600;">
+    Lesson 04 – Services & Unit Testing :
+    <br />
+    <br />
+  </summary>
 
 **Goal**
 Implement a request–response service with verifiable logic.
@@ -162,9 +184,14 @@ Strict separation between:
 * **Business Logic**: Pure, deterministic, no ROS dependencies
 * **Middleware Adapter**: Service server/client that converts ROS types
 
----
+</details>
 
-### Lesson 05 – Parameters & Central Configuration
+<details>
+  <summary style="font-size: 1.25em; font-weight: 600;">
+    Lesson 05 – Parameters & Central Configuration :
+    <br />
+    <br />
+  </summary>
 
 **Goal**
 Make configuration explicit, shared, and safely changeable at runtime.
@@ -182,10 +209,14 @@ Centralise system configuration while keeping node code explicit and determinist
 * Language utilities adapt YAML → parameters → typed access
 * Node behaviour updates safely when configuration changes
 
+</details>
 
----
-
-### Lesson 06 – Lifecycle Management (Managed Nodes)
+<details>
+  <summary style="font-size: 1.25em; font-weight: 600;">
+    Lesson 06 – Lifecycle Management (Managed Nodes) :
+    <br />
+    <br />
+  </summary>
 
 **Goal**
 Establish the "Managed Node" pattern where nodes wait for orchestration rather than starting immediately.
@@ -203,49 +234,111 @@ The ROS 2 Lifecycle State Machine (Unconfigured  Inactive  Active).
 * **Gated Resources**: LifecyclePublishers and LifecycleTimers used to enforce state contracts.
 * **Orchestration Layer**: A dedicated package containing a Custom Manager Node and Integration Test suite.
 
----
+</details>
 
-### Lesson 07 – Actions (Planned)
-
-**Goal**
-Long-running tasks with feedback and cancellation.
-
-**Focus**
-Action servers and clients.
-
-**Architecture**
-Explicit state machines with feedback loops.
-
----
-
-### Lesson 08 – Executors & Callback Groups (Planned)
+<details>
+  <summary style="font-size: 1.25em; font-weight: 600;">
+    Lesson 07 – Actions (Long-Running Work) :
+    <br />
+    <br />
+  </summary>
 
 **Goal**
-Multi-threaded execution.
+Introduce **long-running, cancellable tasks** and expose the difference between functional correctness and system responsiveness.
 
 **Focus**
-Callback group isolation, non-blocking patterns.
+ROS 2 Actions:
+
+* goals, feedback, results
+* cancellation semantics
+* client–server interaction under load
 
 **Architecture**
-Controlled concurrency instead of implicit threading.
 
----
+* Extend the **Lesson 06 Lifecycle Publisher** with an **Action Server**.
+* Add a **standalone Action Client** used to issue goals and observe behaviour.
+* Reuse the **existing Subscriber** unchanged to verify system impact.
 
-### Lesson 09 – Composition (Planned)
+The action performs a deliberately **long-running Fibonacci calculation** on the node’s primary execution path.
+
+This is intentional.
+
+The lesson demonstrates that a node can:
+
+* be lifecycle-correct
+* respond to action goals
+* **and still become operationally unresponsive**
+
+This failure is resolved in Lesson 08.
+
+</details>
+
+<details>
+  <summary style="font-size: 1.25em; font-weight: 600;">
+    Lesson 08 – Executors & Callback Groups :
+    <br />
+    <br />
+  </summary>
 
 **Goal**
- 
+Restore node responsiveness under long-running work without changing functional behaviour.
 
 **Focus**
-Node composition.
+ROS 2 execution control:
+
+* `SingleThreadedExecutor` vs `MultiThreadedExecutor`
+* Callback groups and reentrancy
+* Scheduling of actions, timers, and services
 
 **Architecture**
-No hardcoded paths; runtime discovery only.
+Reuse the Lesson 07 managed node and action implementation.
 
+Change only execution strategy:
 
----
+* Multi-threaded executor
+* Explicit callback group assignment
 
-### Lesson 10 – Launch & Configuration Discovery (Planned)
+Concurrency is introduced deliberately to preserve availability, not to optimise performance.
+
+</details>
+
+<details>
+  <summary style="font-size: 1.25em; font-weight: 600;">
+    Lesson 09 – Composition & Containers :
+    <br />
+    <br />
+  </summary>
+
+**Goal**
+Validate that previously built nodes behave correctly when deployed together in a shared process.
+
+**Focus**
+ROS 2 deployment mechanisms:
+
+* Composable nodes
+* Component containers
+* Shared executors and shared fate
+* Runtime load / unload via ROS tooling
+
+**Architecture**
+Reuse existing nodes unchanged (publisher, subscriber, service, action).
+
+Change only deployment topology:
+
+* Multiple nodes loaded into a single component container
+* Executor ownership moved to the container
+* Callback group choices tested under shared execution
+
+This lesson exposes hidden assumptions about execution, shutdown order, and isolation that only appear under composition.
+
+</details>
+
+<details>
+  <summary style="font-size: 1.25em; font-weight: 600;">
+    Lesson 10 – Launch & Configuration Discovery :
+    <br />
+    <br />
+  </summary>
 
 **Goal**
 Production-grade startup.
@@ -256,7 +349,7 @@ Launch files, installed vs source-tree configuration.
 **Architecture**
 No hardcoded paths; runtime discovery only.
 
----
+</details>
 
 ---
 

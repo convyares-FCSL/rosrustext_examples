@@ -1,0 +1,113 @@
+"""
+Action Server Component (Python).
+
+Implements the Fibonacci action server logic and lifecycle hooks.
+"""
+from __future__ import annotations
+
+from typing import Optional
+
+import rclpy
+from rclpy.action import ActionServer, CancelResponse, GoalResponse
+from rclpy.lifecycle import LifecycleNode
+
+from lesson_interfaces.action import Fibonacci
+from ..logic import FibonacciGenerator
+import time
+
+class ActionServerComponent:
+    """
+    Action Server Component.
+    """
+
+    def __init__(self) -> None:
+        self._action_server: Optional[ActionServer] = None
+        self._node: Optional[LifecycleNode] = None
+        self._generator = FibonacciGenerator()
+        self._enabled = False
+
+    def configure(self, parent_node: LifecycleNode) -> None:
+        """Create resources."""
+        self._node = parent_node
+        # WARNING: This implementation uses a blocking execution model on the
+        # main thread. Long-running goals will block other node operations
+        # (like parameters and lifecycle) unless a MultiThreadedExecutor is used.
+        self._action_server = ActionServer(
+            parent_node,
+            Fibonacci,
+            '~/fibonacci',
+            self._execute_callback,
+            goal_callback=self._goal_callback,
+            cancel_callback=self._cancel_callback,
+        )
+        parent_node.get_logger().info("Action Server configured on '~/fibonacci'")
+
+    def activate(self) -> None:
+        """Enable processing."""
+        self._enabled = True
+
+    def deactivate(self) -> None:
+        """Disable processing."""
+        self._enabled = False
+
+    def cleanup(self, parent_node: LifecycleNode) -> None:
+        """Destroy resources."""
+        if self._action_server:
+            self._action_server.destroy()
+            self._action_server = None
+        self._enabled = False
+
+    def _goal_callback(self, goal_request):
+        """Accept or reject goal."""
+        if not self._enabled:
+            return GoalResponse.REJECT
+        return GoalResponse.ACCEPT
+
+    def _cancel_callback(self, goal_handle):
+        """Accept or reject cancel."""
+        return CancelResponse.ACCEPT
+
+    def _execute_callback(self, goal_handle):
+        """Execute the goal."""
+        goal_id = goal_handle.goal_id.uuid
+        self._node.get_logger().info(f'Executing goal {goal_id}...')
+        
+        order = goal_handle.request.order
+        feedback_msg = Fibonacci.Feedback()
+        sequence = []
+        
+        # Simulate long running task
+        for i in range(order):
+            if not self._enabled:
+                # Abort if deactivated mid-run (optional robustness)
+                self._node.get_logger().warn(f'Goal {goal_id} aborted: Node deactivated')
+                goal_handle.abort()
+                return Fibonacci.Result(sequence=sequence)
+
+            if goal_handle.is_cancel_requested:
+                self._node.get_logger().info(f'Goal {goal_id} canceled')
+                goal_handle.canceled()
+                return Fibonacci.Result(sequence=sequence)
+            
+            # --- CRITICAL: INTENTIONAL BLOCKING FOR LESSON 07 ---
+            # This time.sleep() simulates heavy computation. 
+            # Because this node uses a SingleThreadedExecutor, this call
+            # BLOCKS the shared thread.
+            # CONSEQUENCE: Telemetry timers and Lifecycle service callbacks
+            # CANNOT run until this loop iteration finishes.
+            # ----------------------------------------------------
+            time.sleep(1.0) 
+            
+            val = self._generator.step(sequence)
+            sequence.append(val)
+            
+            feedback_msg.partial_sequence = sequence
+            goal_handle.publish_feedback(feedback_msg)
+            self._node.get_logger().info(f'Feedback for {goal_id}: {sequence}')
+
+        goal_handle.succeed()
+        result = Fibonacci.Result()
+        result.sequence = sequence
+        self._node.get_logger().info(f'Goal {goal_id} succeeded')
+        return result
+        
