@@ -28,10 +28,12 @@ class TelemetryPublisher:
         self._handle: Optional[rclpy.publisher.Publisher] = None 
         self._timer: Optional[Timer] = None
         self._topic_name = ""
+        self._logger = None # NEW: Store logger reference
         self._is_enabled = False
 
     def configure(self, parent_node: LifecycleNode, callback_group: CallbackGroup, period: float) -> None:
         """Create the publisher resources and timer (Inactive state)."""
+        self._logger = parent_node.get_logger()
         self._topic_name = topics.telemetry(parent_node)
         qos_profile = qos.telemetry(parent_node)
         
@@ -53,10 +55,14 @@ class TelemetryPublisher:
     def activate(self) -> None:
         """Enable data flow (Active state)."""
         self._is_enabled = True
+        if self._logger:
+            self._logger.info("Telemetry Publisher Activated")
 
     def deactivate(self) -> None:
         """Disable data flow (Inactive state)."""
         self._is_enabled = False
+        if self._logger:
+            self._logger.info("Telemetry Publisher Deactivated")
 
     def cleanup(self, parent_node: LifecycleNode) -> None:
         """Destroy resources (Unconfigured state)."""

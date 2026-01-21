@@ -86,8 +86,9 @@ Telemetry begins flowing to the subscriber.
 ## Run – Action Client (Terminal 4)
 
 ```bash
-ros2 run lesson_07_actions lesson_07_action_client \
-  --ros-args -r fibonacci:=/lesson_07_action_server/fibonacci
+ros2 run lesson_07_actions lesson_07_action_client --ros-args \
+  --params-file src/4_interfaces/lesson_interfaces/config/topics_config.yaml \
+  --params-file src/4_interfaces/lesson_interfaces/config/qos_config.yaml
 ```
 
 The client demonstrates two cases:

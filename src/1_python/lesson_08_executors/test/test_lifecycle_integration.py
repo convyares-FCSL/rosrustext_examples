@@ -18,8 +18,8 @@ from lifecycle_msgs.msg import Transition
 def generate_test_description():
     dut_node = LaunchNode(
         package='lesson_08_executors',
-        executable='lesson_08_executors',
-        name='lesson_08_executors',
+        executable='lesson_08_action_server',
+        name='lesson_08_action_server',
         parameters=[{'timer_period_s': 0.1}],
         # CRITICAL FIX 1: Force output to screen to catch ImportErrors
         output='screen',
@@ -47,8 +47,8 @@ class TestLifecycleIntegration(unittest.TestCase):
 
     def setUp(self):
         self.node = rclpy.create_node('lifecycle_integration_tester')
-        self.client_get_state = self.node.create_client(GetState, '/lesson_08_executors/get_state')
-        self.client_change_state = self.node.create_client(ChangeState, '/lesson_08_executors/change_state')
+        self.client_get_state = self.node.create_client(GetState, '/lesson_08_action_server/get_state')
+        self.client_change_state = self.node.create_client(ChangeState, '/lesson_08_action_server/change_state')
 
     def tearDown(self):
         self.node.destroy_node()

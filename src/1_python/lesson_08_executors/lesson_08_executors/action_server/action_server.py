@@ -9,10 +9,12 @@ from typing import Optional
 
 import rclpy
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
+from rclpy.callback_groups import CallbackGroup
 from rclpy.lifecycle import LifecycleNode
 
 from lesson_interfaces.action import Fibonacci
 from ..logic import FibonacciGenerator
+from utils_py import topics
 import time
 
 class ActionServerComponent:
@@ -35,21 +37,26 @@ class ActionServerComponent:
         self._action_server = ActionServer(
             parent_node,
             Fibonacci,
-            '~/fibonacci',
+            topics.fibonacci(parent_node),
             self._execute_callback,
             goal_callback=self._goal_callback,
             cancel_callback=self._cancel_callback,
             callback_group=callback_group
         )
-        parent_node.get_logger().info("Action Server configured on '~/fibonacci'")
+        action_name = topics.fibonacci(parent_node)
+        parent_node.get_logger().info(f"Action Server configured on '{action_name}'")
 
     def activate(self) -> None:
         """Enable processing."""
         self._enabled = True
+        if self._node:
+            self._node.get_logger().info("Action Server Activated")
 
     def deactivate(self) -> None:
         """Disable processing."""
         self._enabled = False
+        if self._node:
+            self._node.get_logger().info("Action Server Deactivated")
 
     def cleanup(self, parent_node: LifecycleNode) -> None:
         """Destroy resources."""

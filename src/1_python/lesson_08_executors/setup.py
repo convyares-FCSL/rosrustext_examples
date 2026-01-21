@@ -22,7 +22,7 @@ setup(
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [
-            "lesson_08_executors = lesson_08_executors.action_server.node:main"
+            "lesson_08_action_server = lesson_08_executors.action_server.node:main"
         ],
     },
 )

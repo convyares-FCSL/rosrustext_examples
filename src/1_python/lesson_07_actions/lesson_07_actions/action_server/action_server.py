@@ -35,20 +35,26 @@ class ActionServerComponent:
         self._action_server = ActionServer(
             parent_node,
             Fibonacci,
-            '~/fibonacci',
+            topics.fibonacci(parent_node),
             self._execute_callback,
             goal_callback=self._goal_callback,
             cancel_callback=self._cancel_callback,
         )
-        parent_node.get_logger().info("Action Server configured on '~/fibonacci'")
+        # We need the action name for the log, let's get it again
+        action_name = topics.fibonacci(parent_node)
+        parent_node.get_logger().info(f"Action Server configured on '{action_name}'")
 
     def activate(self) -> None:
         """Enable processing."""
         self._enabled = True
+        if self._node:
+            self._node.get_logger().info("Action Server Activated")
 
     def deactivate(self) -> None:
         """Disable processing."""
         self._enabled = False
+        if self._node:
+            self._node.get_logger().info("Action Server Deactivated")
 
     def cleanup(self, parent_node: LifecycleNode) -> None:
         """Destroy resources."""

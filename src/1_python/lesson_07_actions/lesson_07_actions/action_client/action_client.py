@@ -11,6 +11,7 @@ from typing import List, Optional
 import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node
+from utils_py import topics
 
 from lesson_interfaces.action import Fibonacci
 
@@ -23,13 +24,17 @@ class ActionClientNode(Node):
 
     def __init__(self) -> None:
         super().__init__("lesson_07_action_client")
-        self._action_client = ActionClient(self, Fibonacci, 'fibonacci')
+        action_name = topics.fibonacci(self)
+        self.get_logger().info(f"Connecting to action server: {action_name}")
+        self._action_client = ActionClient(self, Fibonacci, action_name)
 
     def send_goal(self, order: int) -> None:
         self.get_logger().info(f"Waiting for action server 'fibonacci'...")
-        if not self._action_client.wait_for_server(timeout_sec=5.0):
+        if not self._action_client.wait_for_server(timeout_sec=60.0):
             self.get_logger().error("Action server not available")
             return
+
+
 
         goal_msg = Fibonacci.Goal()
         goal_msg.order = order

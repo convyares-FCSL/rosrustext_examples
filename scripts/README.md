@@ -159,4 +159,35 @@ This script:
 3. Uses a shared hygiene helper (`scripts/05_utils/test_helpers.sh`) to ensure no residue is left between tracks.
 4. Prints a final summary table of all tracks.
 
-**Note:** Tests cover Lessons 01-06. Logs are written to `log/tests/<track>/`.
+**Note:** Tests cover Lessons 01-08. Logs are written to `log/tests/<track>/`.
+
+---
+
+## Debugging & Hygiene
+
+When nodes are running (or when they crash and leave artifacts behind), use these commands to inspect and clean the environment.
+
+### 1. Inpect the ROS 2 Graph
+
+| Command | Description |
+| :--- | :--- |
+| `ros2 node list` | List all active nodes. |
+| `ros2 topic list` | Show all advertised topics. |
+| `ros2 service list` | Show all advertised services (including lifecycle). |
+| `ros2 action list` | Show all action servers. |
+| `ros2 node info /<name>` | Show publishers, subscribers, services, and actions for a node. |
+
+### 2. Kill All Lessons & Reset Graph
+
+If the ROS 2 graph gets "stuck" (e.g. ghost nodes after a crash), run the hygiene script. It flushes the ROS 2 daemon, kills all lesson-related processes (Python, C++, Rust), and cleans up rosbridge leftovers.
+
+```bash
+./scripts/05_utils/kill_lessons.sh
+```
+
+### 3. Manual Graph Flush
+If `ros2 node list` shows nodes that aren't actually running:
+```bash
+ros2 daemon stop
+ros2 daemon start
+```
