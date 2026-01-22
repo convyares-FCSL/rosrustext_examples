@@ -1,440 +1,347 @@
-# ROS 2 Lessons Workspace
+# ros2-systems-operability
 
-This repository contains a structured, multi-language ROS 2 lesson series.
+A pressure-driven, multi-language **systems reference** for building ROS 2 deployments that remain **observable, controllable, and verifiable** as complexity increases.
 
-It is designed to teach **core ROS 2 concepts consistently across languages**, while staying close to **professional, production-style usage** rather than toy examples.
+This repository is not a feature tour. It documents how real systems evolve:
 
-The same lesson numbers exist for **Python**, **C++**, **rclrs**, and **roslibrust**, allowing behaviour, naming, configuration, and architectural trade-offs to be compared directly.
+> **pressure → operational failure mode → architectural response**
 
----
-
-## Goals
-
-* **Parity**: A consistent lesson sequence across Python, C++, and Rust.
-* **Production Patterns**: Minimal examples that still use real-world structures (containers, composition, async execution).
-* **Consistency**: Shared topic, service, and action names across languages.
-* **Explicit Trade-offs**: Make language and transport trade-offs visible (e.g. DDS vs bridge, latency vs ergonomics).
+ROS primitives (interfaces, parameters, lifecycle, actions, executors, composition, launch) appear only when the system can no longer meet an operational goal without them.
 
 ---
 
-## Workspace Layout
+## What this repo is (and is not)
 
 <details open>
-<summary>src/</summary>
+<summary><strong>What this is</strong></summary>
+
+- A **language-neutral behavioural reference**, validated by **observable parity** under standard ROS tooling.
+- A sequence of Topics that move from “it runs” to “it deploys” by confronting operational constraints: startup determinism, responsiveness under load, shared-fate deployment, repeatable bring-up and verification.
+- A professional reference style: explicit ownership, minimal glue, structure/testing introduced only when it pays rent.
+
+</details>
+
+<details>
+<summary><strong>What this is not</strong></summary>
+
+- Not a beginner ROS tutorial.
+- Not a language tutorial.
+- Not a prescribed “one true architecture”.
+- Not a claim of a complete, fully-certified safety platform.
+
+It shows problems you will hit and responses that restore control, with trade-offs made visible.
+
+</details>
+
+---
+
+## The behavioural contract
+
+Parity is judged by what the system does **from the outside**, not internal API similarity.
+
+Examples:
+
+- canonical lifecycle behaviour and tooling: `ros2 lifecycle get/set`
+- action behaviour under load: goal / feedback / result / cancel responsiveness
+- composition behaviour via standard tools: `ros2 component load/list/unload`
+- graph visibility and introspection: `ros2 node/topic/service/action …`
+- repeatable bring-up, verification, and clean shutdown (no graph residue)
+
+---
+
+## Workspace layout
+
+The workspace is organised by language implementations and shared contracts. Expand only when you need orientation.
+
+<details>
+<summary><strong>src/ (click to expand)</strong></summary>
 
 ```text
 src/
-├─ 1_python/                 # Python lessons (rclpy)
-│   ├─ lesson_00_bootstrap
-│   ├─ lesson_01_node
-│   ├─ 
+├─ 1_python/                 # rclpy topics + utilities
 │   └─ utils_py/
-│
-├─ 2_cpp/                    # C++ lessons (rclcpp)
-│   ├─ lesson_00_bootstrap
-│   ├─ lesson_01_node
-│   ├─ 
+├─ 2_cpp/                    # rclcpp topics + utilities
 │   └─ utils_cpp/
-│
 ├─ 3_rust/
-│   ├─ 1_rclrs/              # Native Rust nodes (DDS, primary track)
-│   │   ├─ lesson_00_bootstrap
-│   │   ├─ lesson_01_node
-│   │   ├─ 
+│   ├─ 1_rclrs/              # native DDS nodes (Rust)
 │   │   └─ utils_rclrs/
-│   │
-│   └─ 2_rcllibrust/         # Rust via rosbridge (async / external clients)
-│       ├─ lesson_00_bootstrap
-│       ├─ lesson_01_node
-│       ├─ 
-│       └─ utils_rcllibrust/
-│
+│   └─ 2_roslibrust/         # rosbridge/websocket clients (Rust)
+│       └─ utils_roslibrust/
 ├─ 4_interfaces/
-│   ├─ lesson_interfaces/    # Shared ROS interfaces
-│   │   ├─ config/           # YAML configuration
-│   │   ├─ msg/              # Messages
-│   │   ├─ srv/              # Services
-│   │   └─ action/           # Actions
-│   └─ rosidl_rust/          # ROSIDL Rust bindings
-│
-├─ 5_benchmark/              # Latency / jitter studies
-│
-templates/                   # Starter boilerplate
-scripts/                     # Workspace automation
-```
+│   ├─ topic_interfaces/     # shared ROS interfaces + config contract
+│   │   ├─ config/           # YAML naming/QoS contract
+│   │   ├─ msg/
+│   │   ├─ srv/
+│   │   └─ action/
+│   └─ rosidl_rust/          # Rust bindings support
+├─ 5_benchmark/              # engineering benchmarks (evidence, not teaching)
+├─ 6_capstone/               # reference implementation of a larger coherent system
+templates/                   # starter boilerplate
+scripts/                     # build/test/verification automation
 
 </details>
 
 ---
 
-## Lesson Structure
+## Topics
 
-Each lesson is implemented across all languages using the same numbering and naming.
-
-Every lesson is described using the same three lenses:
-
-* **Goal** – what problem the lesson solves
-* **Focus** – the ROS 2 concepts being introduced
-* **Architecture** – the structural pattern being taught
-
-This makes it possible to compare implementations directly while keeping the learning intent clear.
-
----
-
-## Lessons
+Each Topic answers one engineering question. The summaries below are intentionally short; the intent lives in each Topic’s `INTENT.md` and `THEORY.md`.
 
 <details open>
-  <summary style="font-size: 1.25em; font-weight: 600;">
-    Lesson 00 – Bootstrap :
-    <br />
-    <br />
+  <summary style="font-size: 1.25em; font-weight: 650;">
+    Topic 00 — Bootstrap
+    <br /><br />
   </summary>
 
 **Goal**
-Create the smallest possible ROS-capable package per language.
+Establish a repeatable build/run loop per language implementation.
 
 **Focus**
-Build systems (`colcon` vs `cargo`), environment setup, logging, clean shutdown.
+Tooling, environment setup, logging, clean shutdown.
 
 **Architecture**
-Node wrapped in a class/struct to enforce ownership, RAII, and predictable shutdown. No “naked scripts”.
+Explicit ownership and predictable node lifecycle (no rituals, no residue).
 
 </details>
 
 <details>
-  <summary style="font-size: 1.25em; font-weight: 600;">
-    Lesson 01 – Event Loop :
-    <br />
-    <br />
+  <summary style="font-size: 1.25em; font-weight: 650;">
+    Topic 01 — Event Loop
+    <br /><br />
   </summary>
 
 **Goal**
-Introduce continuous execution.
+Run continuously without state becoming opaque over time.
 
 **Focus**
-Timers, parameters, safe state mutation.
+Timers as the event loop; owned state mutation.
 
 **Architecture**
-Explicit event loop with owned state (class members in Python/C++, struct fields in Rust).
+A clear “tick” of reality: deliberate state transitions explainable from logs.
 
 </details>
 
 <details>
-  <summary style="font-size: 1.25em; font-weight: 600;">
-    Lesson 02 – Publisher :
-    <br />
-    <br />
+  <summary style="font-size: 1.25em; font-weight: 650;">
+    Topic 02 — Publisher
+    <br /><br />
   </summary>
 
 **Goal**
-Publish a shared custom message across languages.
+Publish real data across languages without fragile guesses.
 
 **Focus**
-Custom interfaces (`.msg`), configuration reuse, composition.
+Custom interfaces (`.msg`), build + import parity, observable publication.
 
 **Architecture**
-Separation between:
-
-* **Logic** (what data changes)
-* **Lifecycle / Resources** (publisher ownership)
-
-Publishers become injected dependencies rather than global objects.
+Publication as a system contract: shared types and stable naming (not scattered literals).
 
 </details>
 
 <details>
-  <summary style="font-size: 1.25em; font-weight: 600;">
-    Lesson 03 – Subscriber & System Verification :
-    <br />
-    <br />
+  <summary style="font-size: 1.25em; font-weight: 650;">
+    Topic 03 — Subscriber & Verification
+    <br /><br />
   </summary>
 
 **Goal**
-Verify cross-language message flow and transport correctness.
+Prove the system is communicating and make silent graph failures diagnosable.
 
 **Focus**
-QoS compatibility, late joiners, publisher restarts, reset tolerance.
+QoS compatibility, late joiners, restarts, common failure signatures.
 
 **Architecture**
-Subscriber implemented as a **self-contained component**:
-
-* Logic injected into callbacks (native nodes)
-* Async stream processing inside a background task (roslibrust)
-
-This lesson treats the subscriber as a **verification tool**, not just a data consumer.
+Subscriber as a verification instrument (detect/report/explain), not just a consumer.
 
 </details>
 
 <details>
-  <summary style="font-size: 1.25em; font-weight: 600;">
-    Lesson 04 – Services & Unit Testing :
-    <br />
-    <br />
+  <summary style="font-size: 1.25em; font-weight: 650;">
+    Topic 04 — Services
+    <br /><br />
   </summary>
 
 **Goal**
-Implement a request–response service with verifiable logic.
+Add request/response without welding meaning to ROS callbacks.
 
 **Focus**
-Services, async request handling, testability.
+Services, clean adapter boundaries, unit evidence when logic exists.
 
 **Architecture**
-Strict separation between:
-
-* **Business Logic**: Pure, deterministic, no ROS dependencies
-* **Middleware Adapter**: Service server/client that converts ROS types
+Pure deterministic logic + thin ROS adapters (tests appear because they now pay rent).
 
 </details>
 
 <details>
-  <summary style="font-size: 1.25em; font-weight: 600;">
-    Lesson 05 – Parameters & Central Configuration :
-    <br />
-    <br />
+  <summary style="font-size: 1.25em; font-weight: 650;">
+    Topic 05 — Parameters & Configuration
+    <br /><br />
   </summary>
 
 **Goal**
 Make configuration explicit, shared, and safely changeable at runtime.
 
 **Focus**
-Use ROS parameters as a live configuration interface rather than startup-only defaults.
-
-* validation and runtime updates via parameter callbacks
-* updated, production-style publishers and subscribers
+Parameters as a live control surface; validation and runtime updates.
 
 **Architecture**
-Centralise system configuration while keeping node code explicit and deterministic.
-
-* Central YAML defines topics, services, and QoS
-* Language utilities adapt YAML → parameters → typed access
-* Node behaviour updates safely when configuration changes
+Shared config contract (YAML) with per-language typed accessors; no hidden coupling.
 
 </details>
 
 <details>
-  <summary style="font-size: 1.25em; font-weight: 600;">
-    Lesson 06 – Lifecycle Management (Managed Nodes) :
-    <br />
-    <br />
+  <summary style="font-size: 1.25em; font-weight: 650;">
+    Topic 06 — Lifecycle (Managed Nodes)
+    <br /><br />
   </summary>
 
 **Goal**
-Establish the "Managed Node" pattern where nodes wait for orchestration rather than starting immediately.
+Stop “noisy scripts” and make nodes externally orchestratable components.
 
 **Focus**
-The ROS 2 Lifecycle State Machine (Unconfigured  Inactive  Active).
-
-* **Deterministic Startup**: Orchestrating a fleet using a Manager Node.
-* **Gated Execution**: Publishers and timers that are silent unless `Active`.
-* **Verification**: Automated integration testing (`launch_testing`) and standard compliance check (Nav2).
+Lifecycle state machine; gated side effects; canonical tooling surfaces.
 
 **Architecture**
-
-* **State Ownership**: Native inheritance (`rclpy`/`rclcpp`) or `rosrustext` adapters (Rust).
-* **Gated Resources**: LifecyclePublishers and LifecycleTimers used to enforce state contracts.
-* **Orchestration Layer**: A dedicated package containing a Custom Manager Node and Integration Test suite.
+Allocate on configure, produce effects only when active; observable state from the outside.
 
 </details>
 
 <details>
-  <summary style="font-size: 1.25em; font-weight: 600;">
-    Lesson 07 – Actions (Long-Running Work) :
-    <br />
-    <br />
+  <summary style="font-size: 1.25em; font-weight: 650;">
+    Topic 07 — Actions
+    <br /><br />
   </summary>
 
 **Goal**
-Introduce **long-running, cancellable tasks** and expose the difference between functional correctness and system responsiveness.
+Model long-running cancellable work and expose the operational failure mode.
 
 **Focus**
-ROS 2 Actions:
-
-* goals, feedback, results
-* cancellation semantics
-* client–server interaction under load
+Actions (goal/feedback/result/cancel), deliberate executor starvation failure.
 
 **Architecture**
-
-* Extend the **Lesson 06 Lifecycle Publisher** with an **Action Server**.
-* Add a **standalone Action Client** used to issue goals and observe behaviour.
-* Reuse the **existing Subscriber** unchanged to verify system impact.
-
-The action performs a deliberately **long-running Fibonacci calculation** on the node’s primary execution path.
-
-This is intentional.
-
-The lesson demonstrates that a node can:
-
-* be lifecycle-correct
-* respond to action goals
-* **and still become operationally unresponsive**
-
-This failure is resolved in Lesson 08.
+Correct work can still kill operability; this Topic ends with controlled degradation.
 
 </details>
 
 <details>
-  <summary style="font-size: 1.25em; font-weight: 600;">
-    Lesson 08 – Executors & Callback Groups :
-    <br />
-    <br />
+  <summary style="font-size: 1.25em; font-weight: 650;">
+    Topic 08 — Executors & Callback Groups
+    <br /><br />
   </summary>
 
 **Goal**
-Restore node responsiveness under long-running work without changing functional behaviour.
+Restore responsiveness under load without changing the work.
 
 **Focus**
-ROS 2 execution control:
-
-* `SingleThreadedExecutor` vs `MultiThreadedExecutor`
-* Callback groups and reentrancy
-* Scheduling of actions, timers, and services
+Executor choice, callback group isolation, scheduling as availability.
 
 **Architecture**
-Reuse the Lesson 07 managed node and action implementation.
-
-Change only execution strategy:
-
-* Multi-threaded executor
-* Explicit callback group assignment
-
-Concurrency is introduced deliberately to preserve availability, not to optimise performance.
+Change scheduling only; semantics remain identical; survivability becomes measurable.
 
 </details>
 
 <details>
-  <summary style="font-size: 1.25em; font-weight: 600;">
-    Lesson 09 – Composition & Containers :
-    <br />
-    <br />
+  <summary style="font-size: 1.25em; font-weight: 650;">
+    Topic 09 — Composition & Containers
+    <br /><br />
   </summary>
 
 **Goal**
-Validate that previously built nodes behave correctly when deployed together in a shared process.
+Expose deployment-induced failure modes under shared process/executor fate.
 
 **Focus**
-ROS 2 deployment mechanisms:
-
-* Composable nodes
-* Component containers
-* Shared executors and shared fate
-* Runtime load / unload via ROS tooling
+Component containers, runtime load/list/unload, shared-fate behaviour.
 
 **Architecture**
-Reuse existing nodes unchanged (publisher, subscriber, service, action).
-
-Change only deployment topology:
-
-* Multiple nodes loaded into a single component container
-* Executor ownership moved to the container
-* Callback group choices tested under shared execution
-
-This lesson exposes hidden assumptions about execution, shutdown order, and isolation that only appear under composition.
+Change topology only; co-location reveals coupling and shutdown/order assumptions.
 
 </details>
 
-<details>
-  <summary style="font-size: 1.25em; font-weight: 600;">
-    Lesson 10 – Launch & Configuration Discovery :
-    <br />
-    <br />
+<details open>
+  <summary style="font-size: 1.25em; font-weight: 650;">
+    Topic 10 — Launch, Topology & Deployment Verification
+    <br /><br />
   </summary>
 
 **Goal**
-Production-grade startup.
+Make bring-up, verification, and clean shutdown repeatable when topology matters.
 
 **Focus**
-Launch files, installed vs source-tree configuration.
+Launch-driven bring-up, config discovery, deployment verification scripts.
 
 **Architecture**
-No hardcoded paths; runtime discovery only.
+Topology becomes an engineering artifact; verification becomes executable evidence.
 
 </details>
-
----
-
-## Testing
-
-This workspace includes a robust testing suite for Python, C++, and Rust (`rclrs`) tracks. The tests verify node functionality, communication (pub/sub/service), parameter handling, and lifecycle orchestration.
-
-### Track Commands
-
-You can run tests for a specific track or all tracks at once:
-
-| Track | Command |
-|-------|---------|
-| **All Tracks** | `./scripts/04_tests/run_all.sh` |
-| Python | `./scripts/04_tests/run_python.sh` |
-| C++ | `./scripts/04_tests/run_cpp.sh` |
-| Rust (rclrs) | `./scripts/04_tests/run_rclrs.sh` |
-
-### Logs & Interpretation
-
-Test logs are stored in `log/tests/`, grouped by track (e.g., `log/tests/python/`). 
-A **PASS** indicates the node output matches the expected pattern (regex) or the logic verification succeeded.
-
-### Test Hygiene & "Ghost Nodes"
-
-The suite implements a strict hygiene mechanism to ensure clean runs:
-- **Process Groups**: Every node is launched in a dedicated process group (`setsid -w`).
-- **Traps**: Scripts use bash traps to ensure all processes are terminated (SIGTERM followed by SIGKILL) on exit, failure, or interruption (Ctrl+C).
-- **Graph & Residue Check**: Scripts verify the ROS graph is sterile between runs.
-- **Daemon Flushing**: If a "ghost node" (a node visible in the graph whose process has actually terminated) is detected, the script automatically restarts the `ros2 daemon` to flush the cache.
-
----
-
-## Configuration Pattern
-
-Strings such as topic and service names are **not hardcoded** in node code.
-
-* **Definitions**: `src/4_interfaces/config/` (YAML)
-* **Access**:
-
-  * Python: `utils_py`
-  * C++: `utils_cpp`
-  * Rust (native): `utils_rclrs`
-  * Rust (bridge): `utils_rcllibrust`
-
-This allows system-wide changes by editing configuration rather than source.
-
----
-
-## Language Notes
-
-### Python (`rclpy`)
-
-Optimised for orchestration and rapid iteration.
-
-* **See**: `src/1_python/README.md` for build tips (`--symlink-install`).
-
-### C++ (`rclcpp`)
-
-Reference implementation with lowest latency and maximum control.
-
-* **See**: `src/2_cpp/README.md` for header/source split details.
-
-### Rust
-
-Two complementary tracks:
-
-* **rclrs**: Native DDS nodes built with `colcon`
-* **roslibrust**: Async external clients using `rosbridge`
-
-Together they demonstrate both embedded and integration-focused roles.
-
-* **See**: `src/3_rust/README.md` for critical build dependency instructions (`../../install/...`).
 
 ---
 
 ## Benchmarks
 
-`src/5_benchmark` contains optional latency and jitter studies.
-These are **engineering references**, not lessons.
+Benchmarks exist to answer one question *after* parity is established:
+
+**Given identical observable behaviour, what do different language/runtime choices cost and buy us?**
+
+`src/5_benchmark` contains latency/jitter and “under pressure” studies used to justify **right language for the right role** with evidence rather than preference.
 
 ---
 
-## Workspace Automation
+## Capstone
 
-Helper scripts are provided for deterministic builds and CI use.
+The Capstone demonstrates mastery **without inventing new semantics**.
 
-See: `scripts/README.md`
+Located in `src/6_capstone`, it applies the contracts from Topics 00–10 to a realistic, coherent system. It serves as the final integration evidence:
+
+* **Scope:** Multiple components with explicit orchestration.
+* **Focus:** Controlled failure domains, configuration-driven behaviour, and clean shutdown.
+* **Verification:** Exercises the deployment topology, not just the code.
+
+---
+
+## Verification philosophy
+
+Verification grows only when it becomes the cheapest form of evidence:
+
+* **Unit** evidence appears when logic is separable (Topic 04).
+* **Integration** evidence appears when orchestration exists (Topic 06).
+* **Deployment** evidence appears when topology and bring-up become dominant risk (Topic 10).
+
+---
+
+## Running the test/verification harness
+
+|             Suite | Command                                |
+| ----------------: | -------------------------------------- |
+|               All | `./scripts/04_tests/run_all.sh`        |
+|            Python | `./scripts/04_tests/run_python.sh`     |
+|               C++ | `./scripts/04_tests/run_cpp.sh`        |
+|      Rust (rclrs) | `./scripts/04_tests/run_rclrs.sh`      |
+| Rust (roslibrust) | `./scripts/04_tests/run_roslibrust.sh` |
+
+Logs land under `log/tests/`. The harness enforces graph hygiene (no residue, no ghost nodes).
+
+---
+
+## Configuration contract
+
+System strings (topic/service/action names, QoS profiles) are treated as a shared contract.
+
+* **Definitions:** `src/4_interfaces/topic_interfaces/config/`
+* **Accessors:** `utils_py`, `utils_cpp`, `utils_rclrs`, `utils_roslibrust`
+
+---
+
+## Implementations (reference links)
+
+This repo uses multiple implementations to validate the same observable behaviours. Upstream references:
+
+* ROS docs (general, incl. rclpy/rclcpp): [https://docs.ros.org/](https://docs.ros.org/)
+* `rclrs` (Rust DDS): [https://github.com/ros2-rust/ros2_rust](https://github.com/ros2-rust/ros2_rust)
+* `rosbridge_suite`: [https://github.com/RobotWebTools/rosbridge_suite](https://github.com/RobotWebTools/rosbridge_suite)
+
+---
+
+## Templates and automation
+
+* `templates/` — starter boilerplate for new packages
+* `scripts/` — build/test/verification runners and utilities
