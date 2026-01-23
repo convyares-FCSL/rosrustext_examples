@@ -1,285 +1,280 @@
-### Overview
+## Lesson 09 Intent: Composition & Containers
 
-Yes. Below is a **full, clean Lesson 10 intent**, written to match the **style, rigor, and architectural discipline of Lessons 08 and 09**, and explicitly positioned as the *resolution* to Lesson 09 — **without retroactively fixing it**.
-
-This is an **intent document**, not an implementation guide. It locks scope, sequencing, and teaching responsibility.
+### *Deployment as a Truth Serum*
 
 ---
 
-## Lesson 10 Intent: Launch, Topology & Deployment Verification
-
-### *Architecture Is Where You Draw the Fault Lines*
-
----
-
-## Lesson 10 – Choosing Where Failure Is Allowed
+## Lesson 09 – When Correct Nodes Fail Together
 
 **Theme:**
-Correct nodes.
-Correct composition.
-Still unsafe — until topology is explicit.
+Your nodes are correct.
+Your deployment is not.
 
-Lesson 09 exposed a truth:
+Lesson 08 proved that **internal concurrency** can be made survivable without changing logic.
+Lesson 09 proves a harder truth:
 
-> Composition co-locates failure.
+> Correct nodes can still fail when **co-located**.
 
-Lesson 10 exists to answer the next, unavoidable question:
-
-> **Where should failures be allowed to propagate — and where must they stop?**
-
-This lesson does not introduce new node behaviour.
-It introduces **intentional deployment structure**.
+Nothing breaks because of bugs.
+Things break because of **shared fate**.
 
 ---
 
 ## Context (What the Student Already Knows)
 
-By the end of Lesson 09, the student has:
+By the end of Lesson 08, the student has:
 
-* Correct, lifecycle-managed nodes
-* Long-running actions that are internally survivable
+* Lifecycle-managed nodes that behave correctly
+* Long-running actions that do not starve the node
 * Explicit callback group isolation
-* A composable container that supports:
+* A working mental model of:
 
-  * runtime load / unload
-  * shared executors
-  * standard ROS tooling introspection
+  * executors as schedulers
+  * callback groups as isolation boundaries
 
-They have also seen:
-
-* interference between nodes
-* shutdown-order hazards
-* shared-fate failure modes
-
-Nothing is “wrong”.
-
-The system is simply **honest**.
+Each node, **in isolation**, is operationally healthy.
 
 ---
 
-## The New Question Lesson 10 Asks
+## The New Question Lesson 09 Asks
 
-> How do we deploy this system so that **failure domains match intent**?
+> What happens when **multiple healthy nodes share a process, an executor, and a shutdown boundary**?
 
-This is no longer a ROS API question.
-It is an **operational architecture question**.
+This is not a new algorithmic problem.
+It is a **deployment topology problem**.
 
 ---
 
-## Lesson 10 Goal
+## Lesson 09 Goal
 
-Demonstrate **production-grade deployment** by:
+Expose **deployment-induced failure modes** by changing **only how nodes are hosted**, not how they behave.
 
-* Making **process boundaries explicit**
-* Using **launch** to define topology
-* Proving correctness through **automated verification scripts**
+Specifically:
 
-Lesson 10 turns a truthful-but-fragile system
-into a **repeatably deployable one**.
+* Nodes that worked perfectly as standalone processes
+* Are now loaded into a **single composable container**
+* With **shared executor ownership**
+* And **shared lifecycle and shutdown fate**
+
+No node logic changes.
+No fixes are applied.
 
 ---
 
 ## What This Lesson Introduces
 
-Lesson 10 introduces **deployment orchestration as a first-class concern**.
+Lesson 09 introduces **composition as an operational primitive**, not a convenience feature.
 
 ### New primitives (deployment-level only):
 
-1. **Launch files as architecture**
-2. **Selective composition**
-3. **Explicit process boundaries**
-4. **Deployment verification scripts**
+1. **Component Containers**
+2. **Runtime Node Loading / Unloading**
+3. **Shared Executor Ownership**
+4. **Process-Level Failure Domains**
 
-No new node logic.
-No new ROS semantics.
-No “fixes” inside components.
+These are not abstractions.
+They are **constraints**.
 
 ---
 
 ## Artifact Produced
 
-### A Deployment-Ready System
+### A Composable System
 
-The system is now deployed using **launch**, with:
+A single **Component Container process** that dynamically hosts:
 
-* One or more **component containers**
-* One or more **standalone node processes**
-* Explicit decisions about:
+* Telemetry publisher (lifecycle-managed)
+* Verifier / subscriber
+* Service server
+* Action server (long-running work)
 
-  * which nodes share a process
-  * which nodes must be isolated
-  * startup order
-  * shutdown order
+All nodes are **previous lesson artifacts**, unmodified.
 
-The topology is intentional, documented, and reproducible.
+The container:
 
----
-
-## What Changes from Lesson 09
-
-Nothing about the nodes changes.
-
-What changes is **where they run**.
-
-Examples of intentional decisions (illustrative, not prescriptive):
-
-* Telemetry publisher + verifier share a container
-* Action server runs in its own process
-* Lifecycle-managed nodes are activated only after all dependencies are present
-
-These decisions are encoded **only** in launch and scripts.
+* Owns the executor
+* Owns node lifetime
+* Exposes standard ROS 2 composition services
+* Is observable via standard CLI tools
 
 ---
 
 ## What Must Be Demonstrated
 
-Lesson 10 is complete only when **all of the following are true**:
+Lesson 09 is complete only when **all of the following are true**:
 
-### 1. Deterministic Bring-Up
+### 1. Tooling Parity Exists
 
-* Launch brings the full system up reliably
-* No hardcoded paths (installed vs source-tree works)
-* Parameters and configuration are discovered at runtime
+* `ros2 component list` shows loaded nodes
+* `ros2 component load` loads existing lesson nodes
+* `ros2 component unload` removes them cleanly
+* `ros2 lifecycle get/set` works on composed lifecycle nodes
 
----
-
-### 2. Explicit Failure Containment
-
-* Failure or load in one node does **not** stall unrelated nodes
-* Long-running actions no longer degrade system-wide responsiveness
-* Shutdown of one component does not cascade unexpectedly
-
-The student must be able to point to **process boundaries** and say:
-
-> “That’s why this failure stopped there.”
+No custom tools.
+No proxy commands.
+No lesson-only hacks.
 
 ---
 
-### 3. Tooling Parity Is Preserved
+### 2. Intentional Failure Is Observable
 
-Despite the new topology:
+At least one of the following **must fail or degrade** under composition:
 
-* `ros2 node list` remains meaningful
-* `ros2 lifecycle get/set` still works
-* `ros2 component list` still works where composition is used
-* No custom orchestration tools replace standard ROS ones
+* Callback group isolation assumptions break
+* One node’s work interferes with another’s responsiveness
+* Lifecycle transitions are delayed or reordered
+* Shutdown order causes observable misbehavior
+
+This failure is **not fixed** in Lesson 09.
+
+It is named.
+Observed.
+Explained.
 
 ---
 
-### 4. Deployment Verification Is Automated
+### 3. Failure Is Deployment-Induced
 
-Lesson 10 introduces **verification scripts** that:
+The student must be able to reason:
 
-* launch the system
-* wait for readiness
-* perform lifecycle transitions
-* detect failure
-* enforce clean shutdown
+> “This node worked before.
+> It still works in isolation.
+> It fails because of *where* it runs.”
 
-This completes the verification pyramid:
+If the failure can be blamed on:
 
-> unit → integration → deployment
+* bad Fibonacci math
+* missing locks
+* sloppy callback groups inside a node
+
+Then the lesson has failed.
+
+---
+
+### 4. Wins Still Exist
+
+Despite failure modes:
+
+* Nodes still perform their core work
+* Behavior matches standalone execution **when not interfering**
+* The system remains introspectable
+* No undefined or “mystery” behavior is introduced
+
+Lesson 09 is not chaos.
+It is **controlled exposure**.
 
 ---
 
 ## Core Teaching Points
 
-### 1. Launch Files Are Architecture
+### 1. Composition Is Not an Optimization
 
-Launch is not a convenience wrapper.
+Composition is not about:
 
-It is where:
+* reducing processes
+* saving memory
+* improving performance
 
-* topology is defined
-* failure domains are chosen
-* operational intent becomes executable
-
----
-
-### 2. Composition Is a Tool, Not a Goal
-
-Lesson 09 proved:
-
-> Composition reveals truth.
-
-Lesson 10 proves:
-
-> Composition must be used selectively.
+It is about **changing failure domains**.
 
 ---
 
-### 3. Isolation Is an Architectural Choice
+### 2. Executors Define Shared Fate
 
-Isolation does not come from:
+Lesson 08 taught:
 
-* callback groups
-* executors
-* async code
+> Executors decide who gets to breathe.
 
-It comes from **process boundaries**.
+Lesson 09 extends this:
+
+> **Shared executors decide who suffocates together.**
+
+Isolation inside a node is insufficient
+when nodes share a scheduler.
+
+---
+
+### 3. Deployment Reveals Architectural Honesty
+
+Composition does not change semantics.
+
+It reveals:
+
+* hidden coupling
+* unexamined assumptions
+* accidental dependencies
 
 ---
 
 ## What This Lesson Is *Not*
 
-Lesson 10 is **not**:
+Lesson 09 is **not**:
 
 * a refactor of nodes
-* a rewrite of Lesson 09
-* a performance tuning exercise
-* a replacement for ROS tools
-* an excuse to hide failures
+* a concurrency fix
+* a performance lesson
+* a launch tutorial
+* a workaround for missing tools
 
-It does not make the system “perfect”.
-
-It makes it **operable**.
+Any “fix” belongs to a **future lesson or capstone**, not here.
 
 ---
 
 ## Boundary Conditions (Architectural Rules)
 
-Lesson 10 must obey:
+Lesson 09 must obey:
 
 * No changes to node logic
 * No changes to public interfaces
-* No new ROS semantics
-* No tutorial glue
-* Only deployment topology may change
+* No new semantic behavior
+* No tutorial glue inside nodes
+* Only canonical ROS 2 interfaces
 
-If something cannot be solved with launch and orchestration,
-it does **not** belong in Lesson 10.
+If composition parity is missing, that is a **library or infrastructure gap**, not a lesson excuse.
 
 ---
 
-## Relationship to Capstone & Benchmark
+## Relationship to Lesson 10
 
-Lesson 10 completes the teaching arc.
+Lesson 09 answers:
 
-Everything after this point:
+> “What breaks when we deploy this for real?”
 
-* benchmarks
-* capstone systems
-* performance analysis
+Lesson 10 answers:
 
-is **application**, not instruction.
+> “How do we bring this up, verify it, and shut it down safely every time?”
 
-The student now owns a system that can:
-
-* be reasoned about
-* be deployed safely
-* fail predictably
+Lesson 09 **creates the problem space**.
+Lesson 10 **operationalizes it**.
 
 ---
 
 ## Mental Model the Student Must Leave With
 
-> **Correct code is necessary.
-> Correct deployment is decisive.
-> Architecture is where reliability lives.**
+> **Correct nodes are necessary.
+> Correct deployment is mandatory.
+> Composition tells the truth.**
 
----
 
-### One next step
 
-Confirm this Lesson 10 intent as final.
-Once locked, the next step is to **define Lesson 10 deployment verification scripts** that operationalize this intent without altering any node or container code.
+## Why This Lesson Does Not Fix the Failure
+
+Lesson 09 deliberately ends with an unresolved problem.
+
+The failure exposed here is **not a bug in the nodes** and **not a flaw in composition mechanics**.
+
+It is a consequence of:
+
+* shared executors
+* shared process lifetimes
+* shared shutdown domains
+
+Composition provides **co-location**, not **isolation**.
+
+No amount of callback group tuning, executor configuration, or container logic
+can change the fact that all composed nodes share the same failure domain.
+
+Attempting to “fix” this inside Lesson 09 would teach the wrong lesson:
+that composition is a safety mechanism.
+
+It is not.

@@ -1,0 +1,50 @@
+
+================================================================================
+src/1_python/lesson_06_lifecycle/setup.py
+================================================================================
+    description="Lesson 05 (Python): parameters.",
+    license="Apache-2.0",
+    tests_require=["pytest"],
+    entry_points={
+        "console_scripts": [
+            "lesson_06_lifecycle_publisher = lesson_06_lifecycle_py.publisher_node:main",
+            "lesson_06_lifecycle_subscriber = lesson_06_lifecycle_py.subscriber_node:main",
+        ],
+    },
+
+================================================================================
+src/1_python/lesson_06_orchestration/setup.py
+================================================================================
+    description="Lesson 06 (Python): Lifecycle Manager for orchestration.",
+    license="Apache-2.0",
+    tests_require=["pytest"],
+    entry_points={
+        "console_scripts": [
+            "lifecycle_manager = lesson_06_orchestration.lifecycle_manager:main",
+        ],
+    },
+
+================================================================================
+src/1_python/lesson_07_actions/setup.py
+================================================================================
+    description="Lesson 07 (Python): actions.",
+    license="Apache-2.0",
+    tests_require=["pytest"],
+    entry_points={
+        "console_scripts": [
+            "lesson_07_action_server = lesson_07_actions.action_server.node:main",
+            "lesson_07_action_client = lesson_07_actions.action_client.action_client:main",
+        ],
+    },
+
+================================================================================
+src/1_python/lesson_08_executors/setup.py
+================================================================================
+    description="Lesson 08 (Python): executors.",
+    license="Apache-2.0",
+    tests_require=["pytest"],
+    entry_points={
+        "console_scripts": [
+            "lesson_08_action_server = lesson_08_executors.action_server.node:main"
+        ],
+    },
