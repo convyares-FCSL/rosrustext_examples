@@ -1,116 +1,206 @@
-# TODO – ROS 2 Lessons Workspace
+# TODO — ROS 2 Systems Workspace
 
-This file tracks the structural, pedagogical, and technical status of the ROS 2 multi-language lesson series.
+This file tracks **release-critical work**, **structural alignment**, and **verification status** across the multi-language ROS 2 systems workspace.
 
----
-
-## 1. High Priority (Structure & Consistency)
-
-- [X] **Normalize Directory Layout**
-  - Layout: `1_python / 2_cpp / 3_rust / 4_interfaces`
-  - Naming: `lesson_XX_<topic>`
-
-- [X] **Lesson 00 (Bootstrap)**
-  - Ensures workspace builds/runs across all 4 tracks.
-
-- [X] **Documentation Baseline**
-  - [X] Restore full roadmap (Lessons 00-09) to root `README.md`.
-  - [X] Document architectural progression (Container -> Event Loop -> Composition).
+It is not a task backlog.
+Items exist here only if they affect **correctness, consistency, or release readiness**.
 
 ---
 
-## 2. Shared Utilities & Configuration
+## 1. Structural Baseline (Stable)
 
-**Strategy**: We use "Shared Utils" packages to prevent magic strings in lesson code.
-* *Current State*: Utils return hardcoded constants (mirrors of the future config).
-* *Future State (Lesson 05)*: Utils will read the YAML files from `4_interfaces/config`.
+These items define the workspace shape and are considered **closed unless explicitly reopened**.
 
-### Utility Packages (Structure Exists)
-- [X] **`utils_py`** (`src/1_python/utils_py`)
-  - [X] Package structure created.
-  - [ ] **Action**: Confirm `setup.py` installs it so lessons can `import utils_py`.
-- [X] **`utils_cpp`** (`src/2_cpp/utils_cpp`)
-  - [X] Package structure created.
-  - [ ] **Action**: Confirm `CMakeLists.txt` exports headers so lessons can `find_package(utils_cpp)`.
-- [X] **`utils_rclrs`** (`src/3_rust/1_rclrs/utils_rclrs`)
-  - [X] Fully functional (returning hardcoded profiles).
-- [X] **`utils_roslibrust`** (`src/3_rust/2_rcllibrust/utils_roslibrust`)
-  - [X] Fully functional (returning hardcoded options).
+* [x] **Directory Layout Normalised**
 
-### Configuration Specs (`src/4_interfaces/config`)
-- [X] **File Structure Created**:
-  - `topics_config.yaml` (Defines topic names)
-  - `qos_config.yaml` (Defines "telemetry", "state", etc. profiles)
-  - `services_config.yaml` (Defines service names)
-- [ ] **Validation**: Ensure content matches the hardcoded values currently in Utils.
+  * `1_python / 2_cpp / 3_rust / 4_interfaces`
+  * `lesson_XX_<topic>` naming retained (structural debt tracked separately)
+
+* [x] **Bootstrap Lesson (00)**
+
+  * Workspace builds and runs across all language tracks.
+
+* [x] **Roadmap & Progression Documented**
+
+  * Root `README.md` lists all sections.
+  * Architectural progression is explicit (Node → Lifecycle → Actions → Executors → Composition → Deployment).
 
 ---
 
-## 3. Lesson Content Matrix
+## 2. Shared Contracts & Configuration (Authoritative)
 
-**Legend**:
-- **[X]**: Completed & Verified.
-- **[S]**: Structure/Folder exists (Work In Progress).
-- **[ ]**: Not started.
+These are **non-optional contract surfaces** used to prevent semantic drift across sections and languages.
 
-| Lesson | Topic | Python | C++ | rclrs | rcllibrust | scripts |
-| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
-| **00** | **Bootstrap** | [X] | [X] | [X] | [X] | [X] |
-| **01** | **Node / Timer** | [X] | [X] | [X] | [X] | [X] |
-| **02** | **Publisher** | [X] | [X] | [X] | [X] | [X] |
-| **03** | **Subscriber** | [X] | [X] | [X] | [X] | [X] |
-| **04** | **Services** | [X] | [X] | [X] | [X] | [X] |
-| **05** | **Parameters** | [X] | [X] | [X] | [X] | [X] |
-| **06** | **Lifecycle** | [X] | [X] | [X] | [X] | [X] |
-| **06b** | **LifecycleManager** | [X] | [X] | [X] | [X] | [X] |
-| **07** | **Actions** | [X] | [ ] | [ ] | [ ] | [ ] |
-| **08** | **Executors** | [X] | [ ] | [ ] | [ ] | [ ] |
-| **09** | **Composition** | [ ] | [ ] | [ ] | [ ] | [ ] |
-| **10** | **Launch** | [ ] | [ ] | [ ] | [ ] | [ ] |
+### Interfaces (`src/4_interfaces`)
+
+* [x] **Canonical configuration files**
+
+  * `topics_config.yaml`
+  * `qos_config.yaml`
+  * `services_config.yaml`
+
+* [ ] **Validation**
+
+  * Confirm all config files match *actual runtime usage* across Python.
+  * Confirm no unused or misleading entries remain.
 
 ---
 
-## 4. Rust-Specific Tasks
+### Utilities (Contract Surfaces, Not Helpers)
 
-- [X] **Dependency Locking**:
-  - `rclrs`: Pinned to git tag.
-  - `roslibrust`: Pinned to `0.18`.
-- [X] **Architecture Refactor**: Split utils into Native vs. Bridge.
-- [X] **Build Isolation**: `rcllibrust` lessons marked `COLCON_IGNORE`.
-- [X] **Fix & Log interfaces**: fix and log interfaces being broken by crate.io.
-- [ ] **Logging consistency**: Ensure `env_logger` (bridge) output format roughly matches ROS 2 logger (native).
+> Utilities are treated as **behavioural contracts**, not convenience libraries.
 
----
+#### Python
 
-## 5. Capstone Preparation
+* [x] **`utils_py` exists and is used consistently**
+* [x] Installed and importable via standard packaging
+* [ ] **Documentation**
 
-- [ ] Create separate Capstone repository
-- [ ] Link Lesson 10 to Capstone repo
-- [ ] Decide final Capstone scope:
-  - languages involved
-  - lifecycle usage
-  - bringup structure
+  * Explicitly state `utils_py` is part of the system contract
+  * Clarify guarantees and non-guarantees (e.g. warnings vs enforcement)
 
----
+#### C++
 
-## 6. Documentation & Cleanup
+* [x] **`utils_cpp` structure exists**
+* [ ] **Export & linkage verification**
 
-- [ ] Verify all lesson packages share the same topic/service/action names
-- [ ] Review top-level README after Lesson 09 is complete
-- [ ] Add diagrams only where they clarify behaviour
-- [ ] Remove `src_archive` once content is migrated or discarded
-- [ ] Ensure `.gitignore` covers:
-  - `build/`
-  - `install/`
-  - `log/`
-  - `target/`
-  - IDE files
+  * Confirm headers and CMake exports allow clean `find_package(utils_cpp)`
+* [ ] Parity review against Python contracts
+
+#### Rust
+
+* [x] **`utils_rclrs` functional**
+* [x] **`utils_roslibrust` functional**
+* [ ] **Logging parity**
+
+  * Align log format semantics (where feasible) with ROS 2 native logging
 
 ---
 
-## 7. Non-Goals (Explicitly Out of Scope)
+## 3. Section (Lesson) Status Matrix
 
-- Teaching ROS 1
-- Teaching DDS internals
-- Teaching Rust language basics
-- Teaching Python or C++ syntax
+> This matrix reflects **verified state**, not intent.
+
+**Legend**
+
+* [x] Complete & verified
+* [ ] Not started / not yet verified
+
+| Section | Topic               | Python | C++ | rclrs | rcllibrust | Scripts |
+| ------: | ------------------- | :----: | :-: | :---: | :--------: | :-----: |
+|      00 | Bootstrap           |   [X]  | [X] |  [X]  |     [X]    |   [X]   |
+|      01 | Node / Timer        |   [X]  | [X] |  [X]  |     [X]    |   [X]   |
+|      02 | Publisher           |   [X]  | [X] |  [X]  |     [X]    |   [X]   |
+|      03 | Subscriber          |   [X]  | [X] |  [X]  |     [X]    |   [X]   |
+|      04 | Services            |   [X]  | [X] |  [X]  |     [X]    |   [X]   |
+|      05 | Parameters          |   [X]  | [X] |  [X]  |     [X]    |   [X]   |
+|      06 | Lifecycle           |   [X]  | [X] |  [X]  |     [X]    |   [X]   |
+|     06b | Lifecycle Manager   |   [X]  | [-] |  [-]  |     [-]    |   [-]   |
+|      07 | Actions             |   [X]  | [X] |  [ ]  |     [ ]    |   [ ]   |
+|      08 | Executors           |   [X]  | [ ] |  [ ]  |     [ ]    |   [ ]   |
+|      09 | Composition         |   [X]  | [ ] |  [ ]  |     [ ]    |   [ ]   |
+|      10 | Launch / Deployment |   [X]  | [ ] |  [ ]  |     [ ]    |   [ ]   |
+
+
+* [ ]  Update C++ lesson 06 to carry clean timer pattern - see lesson 07
+---
+
+## 4. Review & Release Governance (New)
+
+These items tie the workspace to the **Consolidated Review & Release-Readiness Audit**.
+
+* [ ] Close all **Open** and **Answered (Implicit)** items from the latest audit snapshot
+* [ ] Explicitly document all **Deferred (Intentional)** items
+* [ ] Re-run the audit prompt after fixes
+* [ ] Record snapshot date and outcome (no new Open items introduced)
+
+This section must be **empty** before release.
+
+---
+
+## 5. Documentation Alignment (Release-Blocking)
+
+Only items that affect **reader understanding or correctness** are tracked here.
+
+* [ ] Align top-level Python README with:
+
+  * INTENT (one systems question per section)
+  * PHILOSOPHY (pressure, failure, honesty)
+* [ ] Explicitly surface:
+
+  * intentional failures
+  * assumption-breaking across sections
+* [ ] Ensure documentation does **not** smooth over tooling gaps
+
+---
+
+## 6. Structural Debt (Tracked, Not Fixed)
+
+These items are acknowledged but **not release-blocking**.
+
+* [ ] Terminology mismatch (“lesson” vs actual function)
+* [ ] Long-term documentation consolidation
+* [ ] Optional diagram pass (only where behaviour is clarified)
+
+---
+
+---
+
+## 7. Benchmarking & Performance Observation (Post-Contract)
+
+Benchmarks are used to **observe system behaviour under load**, not to optimise or redefine semantics.
+
+They must not:
+
+* introduce new runtime primitives,
+* change node behaviour,
+* or invalidate earlier lessons/topics.
+
+They operate **only on already-verified topologies** (post-Topic 10).
+
+### Status
+
+* [ ] Define benchmark scope:
+
+  * latency
+  * throughput
+  * executor contention
+  * action responsiveness under load
+* [ ] Decide benchmark harness location:
+
+  * separate repository **or**
+  * isolated workspace subtree
+* [ ] Ensure benchmarks:
+
+  * use canonical ROS tooling
+  * do not require lesson-local hooks
+* [ ] Explicitly document:
+
+  * what benchmarks do *not* claim
+  * which results are environment-dependent
+
+Benchmarks are **informational**, not pass/fail gates.
+
+---
+
+## 8. Capstone (Out of Scope for Core Release)
+
+Tracked separately; not required for workspace release.
+
+* [ ] Separate Capstone repository
+* [ ] Decide scope and languages
+* [ ] Link from Section 10 only
+
+---
+
+## 9. Explicit Non-Goals
+
+The following are intentionally excluded:
+
+* Teaching ROS 1
+* Teaching DDS internals
+* Teaching Python, C++, or Rust syntax
+* Hiding system limits or tooling gaps
+
+---
+
