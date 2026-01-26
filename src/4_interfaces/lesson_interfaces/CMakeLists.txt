@@ -15,10 +15,18 @@ set(srv_files
   "srv/ComputeStats.srv"
 )
 
-# 3. Generate Code
+# 3. Define Actions
+set(act_files
+  "action/Fibonacci.action"
+)
+
+# 4. Generate Code
 rosidl_generate_interfaces(${PROJECT_NAME}
   ${msg_files}
   ${srv_files}
+  ${act_files}
 )
+
+install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
 
 ament_package()

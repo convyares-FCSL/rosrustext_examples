@@ -17,6 +17,7 @@ It contains the shared data structures (Messages) and shared configuration (Topi
 │   │   └── topics_config.yaml
 │   ├── msg/                 # .msg definitions (e.g., MsgCount.msg)
 │   ├── srv/                 # .srv definitions
+│   ├── act/                 # .act definitions
 │   ├── CMakeLists.txt
 │   └── package.xml
 │
@@ -34,6 +35,8 @@ It contains the shared data structures (Messages) and shared configuration (Topi
 This package defines the communication contract. It includes:
 
 * **Messages**: Custom data types (like `MsgCount`) to demonstrate generating code from `.msg` files.
+* **Services**: Custom data types (like `ComputeStats`) to demonstrate generating code from `.srv` files.
+* **Actions**: Custom data types (like `Fibonacci`) to demonstrate generating code from `.act` files.
 * **Config**: YAML files that define topic names and QoS profiles. This ensures that a Python Publisher and a Rust Subscriber always agree on the topic name (e.g., `/chatter`) without hardcoding strings in source code.
 
 ### 2. `rosidl_rust`

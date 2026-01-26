@@ -35,11 +35,13 @@ class TelemetryPublisher:
         # Use standard Publisher, not LifecyclePublisher
         self._handle: Optional[rclpy.publisher.Publisher] = None 
         self._topic_name = ""
+        self._logger = None # NEW: Store logger reference
         # The Manual Gate
         self._is_enabled = False
 
     def configure(self, parent_node: LifecycleNode) -> None:
         """Create the publisher resources (Inactive state)."""
+        self._logger = parent_node.get_logger()
         self._topic_name = topics.telemetry(parent_node)
         qos_profile = qos.telemetry(parent_node)
         
@@ -54,11 +56,14 @@ class TelemetryPublisher:
     def activate(self) -> None:
         """Enable data flow (Active state)."""
         self._is_enabled = True
-        # Standard publishers don't have .on_activate(), we just flip the flag.
+        if self._logger:
+            self._logger.info("Telemetry Publisher Activated")
 
     def deactivate(self) -> None:
         """Disable data flow (Inactive state)."""
         self._is_enabled = False
+        if self._logger:
+            self._logger.info("Telemetry Publisher Deactivated")
 
     def cleanup(self, parent_node: LifecycleNode) -> None:
         """Destroy resources (Unconfigured state)."""

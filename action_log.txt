@@ -1,0 +1,5 @@
+Waiting for an action server to become available...
+Sending goal:
+     order: 50
+
+Goal was rejected.

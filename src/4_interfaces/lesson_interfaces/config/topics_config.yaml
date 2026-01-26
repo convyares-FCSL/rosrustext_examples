@@ -3,3 +3,4 @@
     topics:
       chatter: "/tutorial/chatter"
       telemetry: "/tutorial/telemetry"
+      fibonacci: "/tutorial/fibonacci"
