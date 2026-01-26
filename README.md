@@ -78,7 +78,7 @@ src/
 ├─ 6_capstone/               # reference implementation of a larger coherent system
 templates/                   # starter boilerplate
 scripts/                     # build/test/verification automation
-
+```
 </details>
 
 ---
