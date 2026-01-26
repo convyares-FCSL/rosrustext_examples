@@ -1,280 +1,180 @@
-## Lesson 09 Intent: Composition & Containers
+## Topic 09 — Composition & Containers
 
 ### *Deployment as a Truth Serum*
 
 ---
 
-## Lesson 09 – When Correct Nodes Fail Together
+## When Correct Nodes Fail Together
 
-**Theme:**
-Your nodes are correct.
-Your deployment is not.
+By the end of Topic 08, every node in the system is **internally correct**:
 
-Lesson 08 proved that **internal concurrency** can be made survivable without changing logic.
-Lesson 09 proves a harder truth:
+* lifecycle-managed and externally controllable
+* resilient to long-running work
+* responsive under load *in isolation*
+* observable through standard ROS tooling
 
-> Correct nodes can still fail when **co-located**.
+Topic 09 introduces the pressure that invalidates a common assumption:
+
+> **Correct nodes do not guarantee a correct system once deployment topology changes.**
 
 Nothing breaks because of bugs.
-Things break because of **shared fate**.
+Things break because **failure domains change**.
 
 ---
 
-## Context (What the Student Already Knows)
+## The Question This Topic Answers
 
-By the end of Lesson 08, the student has:
+> **What happens when multiple healthy nodes share a process, an executor, and a shutdown boundary?**
 
-* Lifecycle-managed nodes that behave correctly
-* Long-running actions that do not starve the node
-* Explicit callback group isolation
-* A working mental model of:
-
-  * executors as schedulers
-  * callback groups as isolation boundaries
-
-Each node, **in isolation**, is operationally healthy.
-
----
-
-## The New Question Lesson 09 Asks
-
-> What happens when **multiple healthy nodes share a process, an executor, and a shutdown boundary**?
-
-This is not a new algorithmic problem.
+This is not a concurrency problem.
+It is not an algorithmic problem.
 It is a **deployment topology problem**.
 
 ---
 
-## Lesson 09 Goal
+## What Changes in Topic 09
 
-Expose **deployment-induced failure modes** by changing **only how nodes are hosted**, not how they behave.
+Only **how nodes are hosted** changes.
 
-Specifically:
+* Nodes from Topics 06–08 are reused **without modification**
+* Node logic, interfaces, and behaviour remain intact
+* The only new factor is **co-location**
 
-* Nodes that worked perfectly as standalone processes
-* Are now loaded into a **single composable container**
-* With **shared executor ownership**
-* And **shared lifecycle and shutdown fate**
+Specifically, nodes are now:
 
-No node logic changes.
+* loaded into a **single component container**
+* scheduled by a **shared executor**
+* subject to a **shared lifetime and shutdown domain**
+
 No fixes are applied.
+No mitigations are introduced.
+The goal is exposure, not correction.
 
 ---
 
-## What This Lesson Introduces
+## Composition as an Operational Primitive
 
-Lesson 09 introduces **composition as an operational primitive**, not a convenience feature.
+Composition is introduced here **not** as an optimisation and **not** as a convenience.
 
-### New primitives (deployment-level only):
+It is introduced because it:
 
-1. **Component Containers**
-2. **Runtime Node Loading / Unloading**
-3. **Shared Executor Ownership**
-4. **Process-Level Failure Domains**
+* collapses process boundaries
+* merges scheduling domains
+* couples shutdown semantics
+* reveals interference that isolation previously hid
 
-These are not abstractions.
-They are **constraints**.
-
----
-
-## Artifact Produced
-
-### A Composable System
-
-A single **Component Container process** that dynamically hosts:
-
-* Telemetry publisher (lifecycle-managed)
-* Verifier / subscriber
-* Service server
-* Action server (long-running work)
-
-All nodes are **previous lesson artifacts**, unmodified.
-
-The container:
-
-* Owns the executor
-* Owns node lifetime
-* Exposes standard ROS 2 composition services
-* Is observable via standard CLI tools
+Composition does not change semantics.
+It reveals architectural honesty.
 
 ---
 
 ## What Must Be Demonstrated
 
-Lesson 09 is complete only when **all of the following are true**:
+Topic 09 is complete when **deployment-induced effects** are observable **while the system is still running**.
 
-### 1. Tooling Parity Exists
+### 1. Canonical Tooling Still Applies
 
-* `ros2 component list` shows loaded nodes
-* `ros2 component load` loads existing lesson nodes
-* `ros2 component unload` removes them cleanly
-* `ros2 lifecycle get/set` works on composed lifecycle nodes
+The composed system must remain visible and controllable via standard ROS 2 tools:
 
-No custom tools.
+* `ros2 component load / list / unload`
+* `ros2 node list`
+* `ros2 lifecycle get / set`
+* `ros2 action list / send_goal`
+
 No proxy commands.
-No lesson-only hacks.
+No lesson-specific shims.
+No alternate semantics.
 
 ---
 
-### 2. Intentional Failure Is Observable
+### 2. Operability Degrades Without Crashing
 
-At least one of the following **must fail or degrade** under composition:
+At least one of the following must be observable **without terminating the container**:
 
-* Callback group isolation assumptions break
-* One node’s work interferes with another’s responsiveness
-* Lifecycle transitions are delayed or reordered
-* Shutdown order causes observable misbehavior
+* lifecycle transitions are delayed or time out under load
+* telemetry stalls or becomes jittery while work proceeds
+* action cancellation latency becomes unacceptable
+* one node’s work interferes with another’s responsiveness
 
-This failure is **not fixed** in Lesson 09.
+The container remains alive.
+The nodes remain “correct.”
+**Operability degrades anyway.**
 
-It is named.
-Observed.
-Explained.
+This is the core truth of the lesson.
 
 ---
 
-### 3. Failure Is Deployment-Induced
+### 3. Failure Is Clearly Deployment-Induced
 
-The student must be able to reason:
+The student must be able to state, truthfully:
 
-> “This node worked before.
-> It still works in isolation.
-> It fails because of *where* it runs.”
+> “Nothing in the nodes changed.
+> This behaviour changed because of *where* the nodes run.”
 
-If the failure can be blamed on:
+If the failure can be attributed to:
 
-* bad Fibonacci math
+* incorrect logic
 * missing locks
-* sloppy callback groups inside a node
+* poor callback group design inside a node
 
-Then the lesson has failed.
-
----
-
-### 4. Wins Still Exist
-
-Despite failure modes:
-
-* Nodes still perform their core work
-* Behavior matches standalone execution **when not interfering**
-* The system remains introspectable
-* No undefined or “mystery” behavior is introduced
-
-Lesson 09 is not chaos.
-It is **controlled exposure**.
+then Topic 09 has failed.
 
 ---
 
-## Core Teaching Points
+### 4. Shared Fate Is Explicitly Visible
 
-### 1. Composition Is Not an Optimization
+Process-level shared fate is still demonstrated — but as a **secondary confirmation**, not the headline.
 
-Composition is not about:
+When the container terminates:
 
-* reducing processes
-* saving memory
-* improving performance
+* all nodes exit together
+* in-flight actions are interrupted
+* lifecycle state disappears simultaneously
 
-It is about **changing failure domains**.
-
----
-
-### 2. Executors Define Shared Fate
-
-Lesson 08 taught:
-
-> Executors decide who gets to breathe.
-
-Lesson 09 extends this:
-
-> **Shared executors decide who suffocates together.**
-
-Isolation inside a node is insufficient
-when nodes share a scheduler.
+This confirms the failure domain, but it is not the primary lesson.
 
 ---
 
-### 3. Deployment Reveals Architectural Honesty
+## What This Topic Does *Not* Do
 
-Composition does not change semantics.
+Topic 09 does **not**:
 
-It reveals:
+* refactor nodes
+* “fix” interference
+* introduce launch files
+* introduce orchestration policy
+* invent safety guarantees
 
-* hidden coupling
-* unexamined assumptions
-* accidental dependencies
-
----
-
-## What This Lesson Is *Not*
-
-Lesson 09 is **not**:
-
-* a refactor of nodes
-* a concurrency fix
-* a performance lesson
-* a launch tutorial
-* a workaround for missing tools
-
-Any “fix” belongs to a **future lesson or capstone**, not here.
-
----
-
-## Boundary Conditions (Architectural Rules)
-
-Lesson 09 must obey:
-
-* No changes to node logic
-* No changes to public interfaces
-* No new semantic behavior
-* No tutorial glue inside nodes
-* Only canonical ROS 2 interfaces
-
-If composition parity is missing, that is a **library or infrastructure gap**, not a lesson excuse.
-
----
-
-## Relationship to Lesson 10
-
-Lesson 09 answers:
-
-> “What breaks when we deploy this for real?”
-
-Lesson 10 answers:
-
-> “How do we bring this up, verify it, and shut it down safely every time?”
-
-Lesson 09 **creates the problem space**.
-Lesson 10 **operationalizes it**.
-
----
-
-## Mental Model the Student Must Leave With
-
-> **Correct nodes are necessary.
-> Correct deployment is mandatory.
-> Composition tells the truth.**
-
-
-
-## Why This Lesson Does Not Fix the Failure
-
-Lesson 09 deliberately ends with an unresolved problem.
-
-The failure exposed here is **not a bug in the nodes** and **not a flaw in composition mechanics**.
-
-It is a consequence of:
-
-* shared executors
-* shared process lifetimes
-* shared shutdown domains
+Any attempt to “solve” the exposed problem here would teach the wrong lesson.
 
 Composition provides **co-location**, not **isolation**.
 
-No amount of callback group tuning, executor configuration, or container logic
-can change the fact that all composed nodes share the same failure domain.
+---
 
-Attempting to “fix” this inside Lesson 09 would teach the wrong lesson:
-that composition is a safety mechanism.
+## Relationship to Topic 10
 
-It is not.
+Topic 09 answers:
+
+> *What breaks when this system is deployed for real?*
+
+Topic 10 answers:
+
+> *How do we bring it up, verify it, and shut it down reliably despite that reality?*
+
+Topic 09 creates the pressure.
+Topic 10 operationalises the response.
+
+---
+
+## The Mental Model the Student Must Leave With
+
+> **Correct nodes are necessary.**
+> **Correct deployment is mandatory.**
+> **Composition tells the truth.**
+
+---
+
+# 2. Supervisor Agent Alignment Prompt
+
+Use this verbatim as a handoff / reset for the supervising agent.
+

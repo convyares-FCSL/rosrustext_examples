@@ -1,4 +1,4 @@
-# Topic 10 Intent: Launch, Topology & Deployment Verification
+# Topic 10 Intent — Launch, Topology & Deployment Verification
 
 ## Architecture Is Where You Draw the Fault Lines
 
@@ -7,19 +7,20 @@
 ## Topic 10 — Choosing Where Failure Is Allowed
 
 **Theme**
-Correct nodes.
-Correct composition.
+
+Correct nodes.  
+Correct composition.  
 Still unsafe — until topology is explicit.
 
 Topic 09 exposed a hard truth:
 
-> Composition co-locates failure.
+> **Composition co-locates failure.**
 
-Topic 10 exists to answer the next, unavoidable systems question:
+Topic 10 exists to answer the next unavoidable systems question:
 
 > **Where should failures be allowed to propagate — and where must they stop?**
 
-This Topic does **not** introduce new node behaviour.
+This Topic introduces **no new node behaviour**.  
 It introduces **intentional deployment structure**.
 
 ---
@@ -29,19 +30,20 @@ It introduces **intentional deployment structure**.
 By the end of Topic 09, the engineer has:
 
 * Correct, lifecycle-managed nodes
-* Long‑running actions that are internally survivable
-* Explicit callback‑group isolation
-* A composable container that supports:
+* Long-running actions that are internally survivable
+* Explicit callback-group isolation
+* A composed system where:
 
-  * runtime load / unload
-  * shared executors
-  * standard ROS tooling introspection
+  * multiple nodes share a process
+  * executors are shared
+  * shutdown and failure are shared
 
 They have also *observed*:
 
 * interference between nodes
-* shutdown‑order hazards
-* shared‑fate failure modes
+* shutdown-order hazards
+* action interruption under shared fate
+* behaviour changing solely because of deployment
 
 Nothing is broken.
 
@@ -51,46 +53,46 @@ The system is simply **honest**.
 
 ## The Question Topic 10 Answers
 
-> How do we deploy this system so that **failure domains match engineering intent**?
+> **How do we deploy this system so that failure domains match engineering intent?**
 
-This is no longer a ROS API question.
+This is no longer a ROS API question.  
 It is an **operational architecture question**.
 
 ---
 
 ## Topic 10 Goal
 
-Demonstrate **deployment‑grade system design** by:
+Demonstrate **deployment-grade system design** by:
 
 * Making **process boundaries explicit**
-* Using **launch** to define topology
-* Proving behaviour through **automated deployment verification**
+* Using **launch** to declare topology
+* Proving behaviour through **deployment-level verification**
 
-Topic 10 turns a truthful‑but‑fragile system
+Topic 10 turns a truthful-but-fragile system  
 into a **repeatably deployable one**.
 
 ---
 
 ## What This Topic Introduces
 
-Topic 10 introduces **deployment orchestration as a first‑class engineering concern**.
+Topic 10 introduces **deployment orchestration as a first-class engineering concern**.
 
-### New axes of control (deployment‑level only)
+### New axes of control (deployment-level only)
 
 1. **Launch files as architecture**
 2. **Selective composition**
 3. **Explicit process boundaries**
 4. **Deployment verification scripts**
 
-No new node logic.
-No new ROS semantics.
+No new node logic.  
+No new ROS semantics.  
 No fixes hidden inside components.
 
 ---
 
 ## Artifact Produced
 
-### A Deployment‑Ready System Topology
+### An Explicitly Fault-Lined Deployment
 
 The system is deployed via **launch**, with:
 
@@ -102,8 +104,9 @@ The system is deployed via **launch**, with:
   * which nodes must be isolated
   * startup order
   * shutdown order
+  * restart scope
 
-Topology is no longer accidental.
+Topology is no longer accidental.  
 It is intentional, documented, and reproducible.
 
 ---
@@ -114,13 +117,26 @@ Nothing about the nodes changes.
 
 What changes is **where they run**.
 
-Examples of intentional (illustrative, not prescriptive) decisions:
+Topic 10 introduces **two intentional deployment profiles**, using the *same node artifacts*:
 
-* Telemetry publisher + verifier share a container
-* Action server runs in its own process
-* Lifecycle‑managed nodes activate only after dependencies are present
+### Profile A — Fully Composed (Continuity from Topic 09)
 
-These decisions exist **only** in launch and verification scripts.
+* Nodes are co-located under a shared process boundary
+* Shared executor, shared shutdown, shared fate
+
+This profile preserves Topic 09’s truth and is used as a baseline.
+
+---
+
+### Profile B — Fault-Lined (Selective Composition + Isolation)
+
+* Some nodes remain composed
+* At least one node (the long-running action server) is isolated behind a process boundary
+
+This profile exists solely to **draw a fault line**.
+
+No code changes.  
+Only topology changes.
 
 ---
 
@@ -128,34 +144,46 @@ These decisions exist **only** in launch and verification scripts.
 
 Topic 10 is complete only when **all** of the following are true.
 
-### 1. Deterministic Bring‑Up
+---
 
-* Launch brings the full system up reliably
-* Installed vs source‑tree execution both work
-* Configuration is discovered at runtime (no hard‑coded paths)
+### 1. Deterministic Bring-Up
+
+* Launch brings the system up reliably
+* Installed vs source-tree execution both work
+* Configuration is discovered at runtime (no hard-coded paths)
+* Parameters are injected via launch (e.g. YAML), not edited into code
+
+Bring-up is executable, not remembered.
 
 ---
 
-### 2. Explicit Failure Containment
+### 2. Explicit Failure Containment (Deadlock Containment)
 
-* Load or failure in one node does **not** stall unrelated nodes
-* Long‑running actions no longer degrade system‑wide responsiveness
-* Shutdown of one component does not cascade unexpectedly
+At least one **intentional deployment-level failure** must be demonstrated:
 
-The engineer must be able to point to topology and say:
+* The action server is intentionally blocked or deadlocked
+* In **Profile A**, this degrades or stalls unrelated behaviour due to shared fate
+* In **Profile B**, unrelated nodes remain responsive
 
-> “That is why this failure stopped there.”
+The engineer must be able to say:
+
+> “This failure stopped here because of this process boundary.”
+
+This is not about eliminating failure.  
+It is about **containing it deliberately**.
 
 ---
 
 ### 3. Tooling Parity Is Preserved
 
-Despite the new topology:
+Despite topology changes:
 
 * `ros2 node list` remains meaningful
 * `ros2 lifecycle get/set` continues to work
 * `ros2 component list` works where composition is used
 * No custom orchestration replaces standard ROS tools
+
+Observability is preserved across deployment profiles.
 
 ---
 
@@ -165,9 +193,9 @@ Topic 10 introduces **deployment verification scripts** that:
 
 * launch the system
 * wait for readiness
-* perform lifecycle transitions
-* detect failure
-* enforce clean shutdown
+* drive lifecycle transitions
+* detect failure (report, do not hide)
+* enforce clean shutdown and graph convergence
 
 This completes the verification pyramid:
 
@@ -184,24 +212,24 @@ Launch is not a convenience wrapper.
 It is where:
 
 * topology is defined
-* failure domains are chosen
+* fault lines are drawn
 * operational intent becomes executable
 
 ---
 
-### 2. Composition Is a Tool, Not a Goal
+### 2. Composition Reveals Truth — Topology Restores Control
 
 Topic 09 proved:
 
-> Composition reveals truth.
+> Composition reveals coupling.
 
 Topic 10 proves:
 
-> Composition must be used selectively.
+> **Topology determines survivability.**
 
 ---
 
-### 3. Isolation Is an Architectural Choice
+### 3. Isolation Is a Deployment Choice
 
 Isolation does **not** come from:
 
@@ -219,8 +247,8 @@ Topic 10 is **not**:
 
 * a refactor of nodes
 * a rewrite of Topic 09
-* a performance‑tuning exercise
-* a replacement for ROS tools
+* a performance-tuning exercise
+* a replacement for ROS tooling
 * an attempt to hide failure
 
 It does not make the system perfect.
@@ -239,7 +267,7 @@ Topic 10 must obey:
 * No tutorial glue
 * Only deployment topology may change
 
-If something cannot be solved with launch and orchestration,
+If something cannot be solved with launch and orchestration,  
 it does **not** belong here.
 
 ---
@@ -266,6 +294,6 @@ The engineer now owns a system that can:
 
 ## Mental Model to Leave With
 
-> **Correct code is necessary.**
-> **Correct deployment is decisive.**
+> **Correct code is necessary.**  
+> **Correct deployment is decisive.**  
 > **Architecture is where reliability lives.**

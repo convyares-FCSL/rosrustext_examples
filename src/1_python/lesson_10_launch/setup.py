@@ -24,6 +24,7 @@ setup(
     entry_points={
         'console_scripts': [
             'verify_deployment = lesson_10_launch.verification:main',
+            'verify_fault_tolerance = lesson_10_launch.verify_fault_tolerance:main',
         ],
     },
 )

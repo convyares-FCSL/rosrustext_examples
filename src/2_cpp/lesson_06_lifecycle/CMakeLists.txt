@@ -11,6 +11,7 @@ find_package(rclcpp_lifecycle REQUIRED)
 find_package(lifecycle_msgs REQUIRED)
 find_package(utils_cpp REQUIRED)
 find_package(lesson_interfaces REQUIRED)
+find_package(rclcpp_components REQUIRED)
 
 # ---------------------------------------------------------
 # 1. Logic Library (Header-Only)
@@ -31,6 +32,7 @@ ament_target_dependencies(lesson_06_lifecycle_publisher
   lifecycle_msgs
   utils_cpp 
   lesson_interfaces
+  rclcpp_components
 )
 target_include_directories(lesson_06_lifecycle_publisher PRIVATE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -47,6 +49,7 @@ ament_target_dependencies(lesson_06_lifecycle_subscriber
   lifecycle_msgs
   utils_cpp 
   lesson_interfaces
+  rclcpp_components
 )
 target_link_libraries(lesson_06_lifecycle_subscriber stream_validator)
 target_include_directories(lesson_06_lifecycle_subscriber PRIVATE
@@ -59,6 +62,43 @@ target_include_directories(lesson_06_lifecycle_subscriber PRIVATE
 # ---------------------------------------------------------
 install(TARGETS lesson_06_lifecycle_publisher lesson_06_lifecycle_subscriber
   DESTINATION lib/${PROJECT_NAME}
+)
+
+# ---------------------------------------------------------
+# Topic 09 (Composition): Component Registration
+#
+# Build a shared library containing composable node entrypoints so the nodes are
+# discoverable/loadable via canonical `ros2 component types/load/unload`.
+# The existing standalone executables remain available.
+# ---------------------------------------------------------
+add_library(${PROJECT_NAME}_component SHARED
+  src/publisher.cpp
+  src/subscriber.cpp
+)
+target_compile_definitions(${PROJECT_NAME}_component PRIVATE "COMPOSITION_BUILD")
+ament_target_dependencies(${PROJECT_NAME}_component
+  rclcpp
+  rclcpp_lifecycle
+  lifecycle_msgs
+  rclcpp_components
+  utils_cpp
+  lesson_interfaces
+)
+target_link_libraries(${PROJECT_NAME}_component stream_validator)
+target_include_directories(${PROJECT_NAME}_component PRIVATE
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
+rclcpp_components_register_nodes(${PROJECT_NAME}_component
+  "lesson_06_lifecycle_cpp::LifecyclePublisherNode"
+  "lesson_06_lifecycle_cpp::LifecycleSubscriberNode"
+)
+
+install(TARGETS ${PROJECT_NAME}_component
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
 )
 
 install(DIRECTORY include/ DESTINATION include)

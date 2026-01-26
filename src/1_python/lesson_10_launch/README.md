@@ -32,19 +32,23 @@ Lesson 10 adds only:
 
 ---
 
-## Authoritative System Topology
+## Deployment Topologies
 
-Lesson 10 launches **only one topology**:
+Lesson 10 introduces two deployment profiles to demonstrate **failure containment**:
 
-* the Lesson 09 composed deployment
+### Profile A: Shared Fate (Composed)
+*   **Launch**: `composed.launch.py`
+*   **Topology**: Single Python process (Lesson 09).
+*   **Characteristic**: High coupling. Resource starvation in one node (Action Server) degrades the entire process (Lifecycle Nodes).
 
-This topology represents the system’s final deployment form:
+### Profile B: Fault-Lined (Isolated)
+*   **Launch**: `isolated.launch.py`
+*   **Topology**: Multiple processes.
+    *   **Domain 1**: Control Plane (Lifecycle Publisher + Subscriber).
+    *   **Domain 2**: Worker Plane (Action Server).
+*   **Characteristic**: Explicit isolation. Resource starvation in the Worker Plane does **not** degrade the Control Plane.
 
-* multiple nodes in a single Python process
-* shared executor ownership
-* shared shutdown fate
-
-Earlier lessons are prerequisites, not deployment targets.
+These profiles typically use the **same node artifacts** without modification. The only difference is the deployment configuration.
 
 ---
 
@@ -121,6 +125,19 @@ The verifier will:
 Failures are surfaced, not retried or hidden.
 
 ---
+
+## Verification (A/B Test)
+
+To verify the containment hypothesis:
+
+```bash
+ros2 run lesson_10_launch verify_fault_tolerance
+```
+
+This script runs both profiles against a high-load stimulus:
+1.  **Profile A** shows significant latency degradation (> 2x baseline).
+2.  **Profile B** maintains nominal latency (~1.0x baseline).
+3.  **Profile B** survives the termination of the Action Server process.
 
 ## What This Lesson Proves
 

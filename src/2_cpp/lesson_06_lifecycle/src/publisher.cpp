@@ -189,6 +189,17 @@ rcl_interfaces::msg::SetParametersResult LifecyclePublisherNode::on_parameters(
 
 } // namespace lesson_06_lifecycle_cpp
 
+
+#include "rclcpp_components/register_node_macro.hpp"
+
+// Topic 09 (Composition): expose this node as an rclcpp component so it can be
+// discovered/loaded/unloaded via canonical `ros2 component ...` tooling.
+RCLCPP_COMPONENTS_REGISTER_NODE(lesson_06_lifecycle_cpp::LifecyclePublisherNode)
+
+#ifndef COMPOSITION_BUILD
+// Topic 09 (Composition): when building the component shared library we compile
+// without `main()` to avoid duplicate symbols. The standalone executable build
+// path remains unchanged.
 int main(int argc, char ** argv) {
   rclcpp::init(argc, argv);
   auto node = std::make_shared<lesson_06_lifecycle_cpp::LifecyclePublisherNode>();
@@ -198,3 +209,4 @@ int main(int argc, char ** argv) {
   rclcpp::shutdown();
   return 0;
 }
+#endif

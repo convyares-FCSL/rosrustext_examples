@@ -1,0 +1,17 @@
+[INFO] [launch]: All log files can be found below /home/ecm/.ros/log/2026-01-26-21-36-24-560422-FCS-AZ-LAP-CVA-24937
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [lesson_09_composed_deployment-1]: process started with pid [24946]
+[lesson_09_composed_deployment-1] [ERROR] [1769463384.792426059] [rcl]: Failed to parse global arguments
+[lesson_09_composed_deployment-1] Traceback (most recent call last):
+[lesson_09_composed_deployment-1]   File "/home/ecm/ros2_ws_tutorial/install/lesson_09_composition/lib/lesson_09_composition/lesson_09_composed_deployment", line 33, in <module>
+[lesson_09_composed_deployment-1]     sys.exit(load_entry_point('lesson-09-composition==0.0.0', 'console_scripts', 'lesson_09_composed_deployment')())
+[lesson_09_composed_deployment-1]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[lesson_09_composed_deployment-1]   File "/home/ecm/ros2_ws_tutorial/install/lesson_09_composition/lib/python3.12/site-packages/lesson_09_composition/deployment.py", line 11, in main
+[lesson_09_composed_deployment-1]     rclpy.init(args=args)
+[lesson_09_composed_deployment-1]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 88, in init
+[lesson_09_composed_deployment-1]     context.init(args, domain_id=domain_id)
+[lesson_09_composed_deployment-1]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/context.py", line 99, in init
+[lesson_09_composed_deployment-1]     self.__context = _rclpy.Context(
+[lesson_09_composed_deployment-1]                      ^^^^^^^^^^^^^^^
+[lesson_09_composed_deployment-1] rclpy._rclpy_pybind11.RCLError: failed to initialize rcl: Couldn't parse params file: '--params-file /home/ecm/ros2_ws_tutorial/install/lesson_interfaces/share/lesson_interfaces/config/topics_config.yaml'. Error: Error opening YAML file, at ./src/parser.c:271, at ./src/rcl/arguments.c:415
+[ERROR] [lesson_09_composed_deployment-1]: process has died [pid 24946, exit code 1, cmd '/home/ecm/ros2_ws_tutorial/install/lesson_09_composition/lib/lesson_09_composition/lesson_09_composed_deployment --ros-args --params-file /home/ecm/ros2_ws_tutorial/install/lesson_interfaces/share/lesson_interfaces/config/topics_config.yaml --params-file /home/ecm/ros2_ws_tutorial/install/lesson_interfaces/share/lesson_interfaces/config/qos_config.yaml --ros-args'].

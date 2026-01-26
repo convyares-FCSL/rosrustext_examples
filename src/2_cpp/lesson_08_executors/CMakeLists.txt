@@ -13,6 +13,7 @@ find_package(action_msgs REQUIRED)
 find_package(lifecycle_msgs REQUIRED)
 find_package(utils_cpp REQUIRED)
 find_package(lesson_interfaces REQUIRED)
+find_package(rclcpp_components REQUIRED)
 
 # ---------------------------------------------------------
 # 1. Header-only logic (interface target for include paths)
@@ -35,6 +36,7 @@ ament_target_dependencies(lesson_08_actions_server
   lifecycle_msgs
   utils_cpp
   lesson_interfaces
+  rclcpp_components
 )
 target_link_libraries(lesson_08_actions_server lesson_08_logic)
 target_include_directories(lesson_08_actions_server PRIVATE
@@ -64,6 +66,44 @@ target_include_directories(lesson_08_actions_client PRIVATE
 # ---------------------------------------------------------
 install(TARGETS lesson_08_actions_server lesson_08_actions_client
   DESTINATION lib/${PROJECT_NAME}
+)
+
+# ---------------------------------------------------------
+# Topic 09 (Composition): Component Registration
+#
+# Build a shared library containing composable node entrypoints so the nodes are
+# discoverable/loadable via canonical `ros2 component types/load/unload`.
+# The existing standalone executables remain available.
+# ---------------------------------------------------------
+add_library(${PROJECT_NAME}_component SHARED
+  src/action_server_node.cpp
+  src/action_server.cpp
+)
+target_compile_definitions(${PROJECT_NAME}_component PRIVATE "COMPOSITION_BUILD")
+ament_target_dependencies(${PROJECT_NAME}_component
+  rclcpp
+  rclcpp_action
+  rclcpp_lifecycle
+  action_msgs
+  lifecycle_msgs
+  rclcpp_components
+  utils_cpp
+  lesson_interfaces
+)
+target_link_libraries(${PROJECT_NAME}_component lesson_08_logic)
+target_include_directories(${PROJECT_NAME}_component PRIVATE
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
+rclcpp_components_register_nodes(${PROJECT_NAME}_component
+  "lesson_08_executors_cpp::ActionServerNode"
+)
+
+install(TARGETS ${PROJECT_NAME}_component
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
 )
 
 install(DIRECTORY include/ DESTINATION include)

@@ -207,6 +207,17 @@ rcl_interfaces::msg::SetParametersResult ActionServerNode::on_parameters(
 }  // namespace lesson_08_executors_cpp
 
 
+#include "rclcpp_components/register_node_macro.hpp"
+
+
+// Topic 09 (Composition): expose this node as an rclcpp component so it can be
+// discovered/loaded/unloaded via canonical `ros2 component ...` tooling.
+RCLCPP_COMPONENTS_REGISTER_NODE(lesson_08_executors_cpp::ActionServerNode)
+
+#ifndef COMPOSITION_BUILD
+// Topic 09 (Composition): when building the component shared library we compile
+// without `main()` to avoid duplicate symbols. The standalone executable build
+// path remains unchanged.
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
@@ -227,3 +238,4 @@ int main(int argc, char ** argv)
 
   rclcpp::shutdown();
 }
+#endif
