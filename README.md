@@ -17,7 +17,7 @@ ROS primitives (interfaces, parameters, lifecycle, actions, executors, compositi
 
 - A **language-neutral behavioural reference**, validated by **observable parity** under standard ROS tooling.
 - A sequence of Topics that move from “it runs” to “it deploys” by confronting operational constraints: startup determinism, responsiveness under load, shared-fate deployment, repeatable bring-up and verification.
-- A professional reference style: explicit ownership, minimal glue, structure/testing introduced only when it pays rent.
+- A professional reference style: explicit ownership, minimal glue, structure and testing introduced only when they pay rent.
 
 </details>
 
@@ -27,7 +27,7 @@ ROS primitives (interfaces, parameters, lifecycle, actions, executors, compositi
 - Not a beginner ROS tutorial.
 - Not a language tutorial.
 - Not a prescribed “one true architecture”.
-- Not a claim of a complete, fully-certified safety platform.
+- Not a claim of a complete, fully certified safety platform.
 
 It shows problems you will hit and responses that restore control, with trade-offs made visible.
 
@@ -39,22 +39,23 @@ It shows problems you will hit and responses that restore control, with trade-of
 
 Parity is judged by what the system does **from the outside**, not internal API similarity.
 
-Examples:
+Examples of contract surfaces:
 
-- canonical lifecycle behaviour and tooling: `ros2 lifecycle get/set`
-- action behaviour under load: goal / feedback / result / cancel responsiveness
-- composition behaviour via standard tools: `ros2 component load/list/unload`
-- graph visibility and introspection: `ros2 node/topic/service/action …`
+- canonical lifecycle behaviour and tooling (`ros2 lifecycle get/set`)
+- action behaviour under load (goal / feedback / result / cancel responsiveness)
+- composition behaviour via standard tools (`ros2 component load/list/unload`)
+- graph visibility and introspection (`ros2 node/topic/service/action …`)
 - repeatable bring-up, verification, and clean shutdown (no graph residue)
 
 ---
 
 ## Workspace layout
 
-The workspace is organised by language implementations and shared contracts. Expand only when you need orientation.
+The workspace is organised by language implementations and shared contracts.
+Expand only when you need orientation.
 
 <details>
-<summary><strong>src/ (click to expand)</strong></summary>
+<summary><strong>Repository structure (click to expand)</strong></summary>
 
 ```text
 src/
@@ -75,23 +76,26 @@ src/
 │   │   └─ action/
 │   └─ rosidl_rust/          # Rust bindings support
 ├─ 5_benchmark/              # engineering benchmarks (evidence, not teaching)
-├─ 6_capstone/               # reference implementation of a larger coherent system
+├─ 6_capstone/               # integrated reference system
 templates/                   # starter boilerplate
 scripts/                     # build/test/verification automation
-```
+````
+
 </details>
 
 ---
 
 ## Topics
 
-Each Topic answers one engineering question. The summaries below are intentionally short; the intent lives in each Topic’s `INTENT.md` and `THEORY.md`.
+Each Topic answers **one engineering question**.
+Summaries here are deliberately short; the intent lives in each Topic’s
+`INTENT.md` and `THEORY.md`.
 
 <details open>
-  <summary style="font-size: 1.25em; font-weight: 650;">
-    Topic 00 — Bootstrap
-    <br /><br />
-  </summary>
+<summary style="font-size:1.25em;font-weight:650;">
+Topic 00 — Bootstrap
+<br><br>
+</summary>
 
 **Goal**
 Establish a repeatable build/run loop per language implementation.
@@ -100,15 +104,15 @@ Establish a repeatable build/run loop per language implementation.
 Tooling, environment setup, logging, clean shutdown.
 
 **Architecture**
-Explicit ownership and predictable node lifecycle (no rituals, no residue).
+Explicit ownership and predictable node lifetime (no rituals, no residue).
 
 </details>
 
 <details>
-  <summary style="font-size: 1.25em; font-weight: 650;">
-    Topic 01 — Event Loop
-    <br /><br />
-  </summary>
+<summary style="font-size:1.25em;font-weight:650;">
+Topic 01 — Event Loop
+<br>
+</summary>
 
 **Goal**
 Run continuously without state becoming opaque over time.
@@ -122,10 +126,10 @@ A clear “tick” of reality: deliberate state transitions explainable from log
 </details>
 
 <details>
-  <summary style="font-size: 1.25em; font-weight: 650;">
-    Topic 02 — Publisher
-    <br /><br />
-  </summary>
+<summary style="font-size:1.25em;font-weight:650;">
+Topic 02 — Publisher
+<br>
+</summary>
 
 **Goal**
 Publish real data across languages without fragile guesses.
@@ -134,15 +138,15 @@ Publish real data across languages without fragile guesses.
 Custom interfaces (`.msg`), build + import parity, observable publication.
 
 **Architecture**
-Publication as a system contract: shared types and stable naming (not scattered literals).
+Publication as a system contract: shared types and stable naming.
 
 </details>
 
 <details>
-  <summary style="font-size: 1.25em; font-weight: 650;">
-    Topic 03 — Subscriber & Verification
-    <br /><br />
-  </summary>
+<summary style="font-size:1.25em;font-weight:650;">
+Topic 03 — Subscriber & Verification
+<br>
+</summary>
 
 **Goal**
 Prove the system is communicating and make silent graph failures diagnosable.
@@ -151,15 +155,15 @@ Prove the system is communicating and make silent graph failures diagnosable.
 QoS compatibility, late joiners, restarts, common failure signatures.
 
 **Architecture**
-Subscriber as a verification instrument (detect/report/explain), not just a consumer.
+Subscriber as a verification instrument, not just a consumer.
 
 </details>
 
 <details>
-  <summary style="font-size: 1.25em; font-weight: 650;">
-    Topic 04 — Services
-    <br /><br />
-  </summary>
+<summary style="font-size:1.25em;font-weight:650;">
+Topic 04 — Services
+<br>
+</summary>
 
 **Goal**
 Add request/response without welding meaning to ROS callbacks.
@@ -168,15 +172,15 @@ Add request/response without welding meaning to ROS callbacks.
 Services, clean adapter boundaries, unit evidence when logic exists.
 
 **Architecture**
-Pure deterministic logic + thin ROS adapters (tests appear because they now pay rent).
+Pure deterministic logic plus thin ROS adapters.
 
 </details>
 
 <details>
-  <summary style="font-size: 1.25em; font-weight: 650;">
-    Topic 05 — Parameters & Configuration
-    <br /><br />
-  </summary>
+<summary style="font-size:1.25em;font-weight:650;">
+Topic 05 — Parameters & Configuration
+<br>
+</summary>
 
 **Goal**
 Make configuration explicit, shared, and safely changeable at runtime.
@@ -185,104 +189,156 @@ Make configuration explicit, shared, and safely changeable at runtime.
 Parameters as a live control surface; validation and runtime updates.
 
 **Architecture**
-Shared config contract (YAML) with per-language typed accessors; no hidden coupling.
+Shared config contract (YAML) with typed accessors.
 
 </details>
 
 <details>
-  <summary style="font-size: 1.25em; font-weight: 650;">
-    Topic 06 — Lifecycle (Managed Nodes)
-    <br /><br />
-  </summary>
+<summary style="font-size:1.25em;font-weight:650;">
+Topic 06 — Lifecycle (Managed Nodes)
+<br>
+</summary>
 
 **Goal**
 Stop “noisy scripts” and make nodes externally orchestratable components.
 
 **Focus**
-Lifecycle state machine; gated side effects; canonical tooling surfaces.
+Lifecycle state machine; gated side effects.
 
 **Architecture**
-Allocate on configure, produce effects only when active; observable state from the outside.
+Allocate on configure, produce effects only when active.
 
 </details>
 
 <details>
-  <summary style="font-size: 1.25em; font-weight: 650;">
-    Topic 07 — Actions
-    <br /><br />
-  </summary>
+<summary style="font-size:1.25em;font-weight:650;">
+Topic 07 — Actions
+<br>
+</summary>
 
 **Goal**
-Model long-running cancellable work and expose the operational failure mode.
+Model long-running cancellable work and expose operational failure.
 
 **Focus**
-Actions (goal/feedback/result/cancel), deliberate executor starvation failure.
+Actions; deliberate executor starvation.
 
 **Architecture**
-Correct work can still kill operability; this Topic ends with controlled degradation.
+Correct work can still kill operability.
 
 </details>
 
 <details>
-  <summary style="font-size: 1.25em; font-weight: 650;">
-    Topic 08 — Executors & Callback Groups
-    <br /><br />
-  </summary>
+<summary style="font-size:1.25em;font-weight:650;">
+Topic 08 — Executors & Callback Groups
+<br>
+</summary>
 
 **Goal**
 Restore responsiveness under load without changing the work.
 
 **Focus**
-Executor choice, callback group isolation, scheduling as availability.
+Executor choice, callback group isolation.
 
 **Architecture**
-Change scheduling only; semantics remain identical; survivability becomes measurable.
+Scheduling changes; semantics remain identical.
 
 </details>
 
 <details>
-  <summary style="font-size: 1.25em; font-weight: 650;">
-    Topic 09 — Composition & Containers
-    <br /><br />
-  </summary>
+<summary style="font-size:1.25em;font-weight:650;">
+Topic 09 — Composition & Containers
+<br>
+</summary>
 
 **Goal**
-Expose deployment-induced failure modes under shared process/executor fate.
+Expose deployment-induced failure modes under shared fate.
 
 **Focus**
-Component containers, runtime load/list/unload, shared-fate behaviour.
+Component containers, runtime load/list/unload.
 
 **Architecture**
-Change topology only; co-location reveals coupling and shutdown/order assumptions.
+Topology change only; co-location reveals coupling.
 
 </details>
 
-<details open>
-  <summary style="font-size: 1.25em; font-weight: 650;">
-    Topic 10 — Launch, Topology & Deployment Verification
-    <br /><br />
-  </summary>
+<details>
+<summary style="font-size:1.25em;font-weight:650;">
+Topic 10 — Launch, Topology & Deployment Verification
+<br>
+</summary>
 
 **Goal**
 Make bring-up, verification, and clean shutdown repeatable when topology matters.
 
 **Focus**
-Launch-driven bring-up, config discovery, deployment verification scripts.
+Launch-driven bring-up, config discovery, deployment verification.
 
 **Architecture**
-Topology becomes an engineering artifact; verification becomes executable evidence.
+Topology becomes code; verification becomes executable evidence.
 
 </details>
 
 ---
 
+## Language Notes
+
+### Python (`rclpy`)
+
+Python is used as the **orchestration and observability** track.
+
+It prioritises clarity of behaviour, interaction with ROS control surfaces, and ease of provoking and observing failure modes.
+When Python cannot express a canonical ROS capability, the limitation is documented rather than worked around.
+
+*See:* `src/1_python/README.md` (development and iteration notes).
+
+---
+
+### C++ (`rclcpp`)
+
+C++ is used as the **canonical feature surface**.
+
+It exposes the full officially supported ROS API set (lifecycle, executors, composition, containers) and makes intended contracts explicit.
+C++ is not “correct by definition”; it exists to show what the complete toolchain enables so parity can be judged honestly.
+
+*See:* `src/2_cpp/README.md`.
+
+---
+
+### Rust
+
+Rust is used as the **explicit architecture** track.
+
+Ownership, construction order, and lifecycle boundaries must be expressed directly.
+This makes architectural assumptions hard to hide and easy to audit.
+
+Two Rust tracks are maintained:
+
+* **rclrs** — Native DDS nodes built with `colcon`
+* **roslibrust** — Async external clients via `rosbridge`
+
+Rust does not redefine the contract; it enforces it.
+
+*See:* `src/3_rust/README.md`.
+
+---
+
+### Reading the tracks
+
+Tracks are not ranked and are not benchmarks.
+Each exposes different truths under the same Topics.
+Performance and role trade-offs are deferred intentionally.
+
+---
+
 ## Benchmarks
 
-Benchmarks exist to answer one question *after* parity is established:
+Benchmarks are **post-arc evidence**, not teaching.
 
-**Given identical observable behaviour, what do different language/runtime choices cost and buy us?**
+They answer one question *after* Topics 00–10 establish the behavioural contract:
 
-`src/5_benchmark` contains latency/jitter and “under pressure” studies used to justify **right language for the right role** with evidence rather than preference.
+**When observable behaviour is held constant, what do different runtime and topology choices change under pressure?**
+
+`src/5_benchmark` contains repeatable measurements (latency, jitter, load response) used to make costs visible without turning the core Topics into a performance exercise.
 
 ---
 
@@ -290,25 +346,26 @@ Benchmarks exist to answer one question *after* parity is established:
 
 The Capstone demonstrates mastery **without inventing new semantics**.
 
-Located in `src/6_capstone`, it applies the contracts from Topics 00–10 to a realistic, coherent system. It serves as the final integration evidence:
+Located in `src/6_capstone`, it applies the established contract to a coherent system:
 
-* **Scope:** Multiple components with explicit orchestration.
-* **Focus:** Controlled failure domains, configuration-driven behaviour, and clean shutdown.
-* **Verification:** Exercises the deployment topology, not just the code.
+* explicit orchestration
+* controlled failure domains
+* configuration-driven behaviour
+* deployment-level verification
 
 ---
 
 ## Verification philosophy
 
-Verification grows only when it becomes the cheapest form of evidence:
+Verification appears only when it becomes the cheapest form of evidence:
 
-* **Unit** evidence appears when logic is separable (Topic 04).
-* **Integration** evidence appears when orchestration exists (Topic 06).
-* **Deployment** evidence appears when topology and bring-up become dominant risk (Topic 10).
+* **Unit** — when logic is separable (Topic 04)
+* **Integration** — when orchestration matters (Topic 06)
+* **Deployment** — when topology dominates risk (Topic 10)
 
 ---
 
-## Running the test/verification harness
+## Running the test / verification harness
 
 |             Suite | Command                                |
 | ----------------: | -------------------------------------- |
@@ -318,7 +375,7 @@ Verification grows only when it becomes the cheapest form of evidence:
 |      Rust (rclrs) | `./scripts/04_tests/run_rclrs.sh`      |
 | Rust (roslibrust) | `./scripts/04_tests/run_roslibrust.sh` |
 
-Logs land under `log/tests/`. The harness enforces graph hygiene (no residue, no ghost nodes).
+Logs land under `log/tests/`. The harness enforces graph hygiene.
 
 ---
 
@@ -331,11 +388,11 @@ System strings (topic/service/action names, QoS profiles) are treated as a share
 
 ---
 
-## Implementations (reference links)
+## References
 
-This repo uses multiple implementations to validate the same observable behaviours. Upstream references:
+Upstream projects referenced:
 
-* ROS docs (general, incl. rclpy/rclcpp): [https://docs.ros.org/](https://docs.ros.org/)
+* ROS documentation: [https://docs.ros.org/](https://docs.ros.org/)
 * `rclrs` (Rust DDS): [https://github.com/ros2-rust/ros2_rust](https://github.com/ros2-rust/ros2_rust)
 * `rosbridge_suite`: [https://github.com/RobotWebTools/rosbridge_suite](https://github.com/RobotWebTools/rosbridge_suite)
 
@@ -343,5 +400,5 @@ This repo uses multiple implementations to validate the same observable behaviou
 
 ## Templates and automation
 
-* `templates/` — starter boilerplate for new packages
-* `scripts/` — build/test/verification runners and utilities
+* `templates/` — starter boilerplate
+* `scripts/` — build, test, and verification runners
