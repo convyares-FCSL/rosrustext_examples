@@ -3,6 +3,8 @@
 This ledger records **parity observations as facts**, not prescriptions.
 It exists to prevent re-litigating decisions and to track work that can be done later without blocking current sequencing.
 
+---
+
 ## Legend
 
 * ✅ **Answered (Explicit)** – resolved and documented clearly in both tracks
@@ -24,6 +26,8 @@ Parity is judged by what is externally observable through standard ROS tooling:
 * action semantics (goal / feedback / result / cancel)
 * observable starvation shapes under pressure
 
+---
+
 ### 0.2 What this ledger is not
 
 * Not a refactor plan
@@ -32,11 +36,27 @@ Parity is judged by what is externally observable through standard ROS tooling:
 
 ---
 
+### 0.3 Epistemic rule (binding)
+
+No language track is normative by definition.
+
+If two tracks diverge, the source of truth is:
+
+* externally observable behaviour under standard ROS tooling
+* documented constraints of the language or ecosystem
+* reproducible pressure-induced effects
+
+Any claim of correctness based on **“reference lane” status alone** is invalid.
+
+---
+
 ## 1. Release-Blocking Concerns (must not be ambiguous)
 
 > Answers one question only:
 > **What cannot be left ambiguous at point of release?**
 > Items here need either: a fix, explicit docs, or explicit deferral.
+
+---
 
 ### 1.1 Contract surfaces & names
 
@@ -48,7 +68,7 @@ Python uses `topics.fibonacci -> "/tutorial/fibonacci"` by default.
 C++ must match; node-name-derived defaults break Topic 08+ reuse.
 
 **Status**
-✅ Answered (Explicit) — agreed to keep `DEFAULT_FIBONACCI="/tutorial/fibonacci"` in `utils_cpp/topics.hpp`.
+✅ Answered (Explicit)
 
 **Closure evidence**
 `ros2 action list` shows `/tutorial/fibonacci` when server is Active.
@@ -83,13 +103,35 @@ C++ Theory frames it as “correct code that still degrades operationally.”
 
 These are compatible if interpreted as:
 
-> action & lifecycle usage is correct, availability is not ensured under single-threaded scheduling.
+> action & lifecycle usage is correct, availability is not ensured under naïve scheduling.
 
 **Status**
 🟡 Answered (Implicit)
 
 **Closure evidence**
-One sentence in both tracks making that equivalence explicit (optional).
+Observed starvation and recovery sequence is identical by Lesson 08.
+
+</details>
+
+---
+
+### 1.3 Epistemic alignment across tracks
+
+<details>
+<summary><strong>⚠️ EPI-01 — “Reference lane” language implying authority</strong></summary>
+
+**Observation**
+At least one C++ document historically implied C++ as the authoritative or defining implementation, with other languages approximating it.
+
+This conflicts with the repository’s governing rule that **observable behaviour defines truth**, not implementation lineage.
+
+**Status**
+⚠️ Open (documentation-level only)
+
+**Closure evidence**
+Explicit language-neutral statement in PHILOSOPHY or INTENT clarifying that:
+
+> parity is a constraint, and gaps are findings — not deficiencies of “non-reference” lanes.
 
 </details>
 
@@ -103,8 +145,8 @@ One sentence in both tracks making that equivalence explicit (optional).
 <summary><strong>🟡 STR-01 — Different file breakdown across languages</strong></summary>
 
 **Observation**
-Python splits components across multiple small files (publisher, node, action_server).
-C++ uses .hpp/.cpp boundaries and tends to group by compile targets.
+Python splits components across multiple small files.
+C++ groups functionality via `.hpp/.cpp` and compile targets.
 
 Difference is acceptable if contract surfaces remain stable and the split doesn’t introduce hidden semantics.
 
@@ -112,7 +154,7 @@ Difference is acceptable if contract surfaces remain stable and the split doesn�
 🟡 Answered (Implicit)
 
 **Closure evidence**
-Document “structure differs, behaviour must not” in each track’s README.
+Behavioural parity holds under Topics 06–10.
 
 </details>
 
@@ -126,7 +168,33 @@ Document “structure differs, behaviour must not” in each track’s README.
 🕓 Deferred (Intentional)
 
 **Closure evidence**
-Tracked only as structural debt (TODO), no rename required now.
+Tracked as structural debt only.
+
+</details>
+
+---
+
+### 2.2 Epistemic posture differences
+
+<details>
+<summary><strong>🟡 EPI-02 — Behaviour-first vs implementation-first truth framing</strong></summary>
+
+**Observation**
+Python track consistently treats correctness as:
+
+> what standard tooling observes under pressure.
+
+C++ track historically leaned toward:
+
+> what canonical ROS implementations support.
+
+These framings are compatible only when observable behaviour is explicitly the arbiter of truth.
+
+**Status**
+🟡 Answered (Implicit)
+
+**Closure evidence**
+By Topic 10, both tracks converge on identical behavioural outcomes despite tooling asymmetries being surfaced rather than hidden.
 
 </details>
 
@@ -139,108 +207,140 @@ Tracked only as structural debt (TODO), no rename required now.
 <details>
 <summary><strong>✅ L07-01 — Lifecycle gating of action acceptance</strong></summary>
 
-**Observation**
 Goals rejected when Inactive; accepted when Active.
-
-**Status**
-✅ Answered (Explicit)
-
-**Closure evidence**
-Attempt goal send while inactive; server rejects. After activate; accepts.
 
 </details>
 
 <details>
 <summary><strong>✅ L07-02 — Feedback shape is stable and observable</strong></summary>
 
-**Observation**
-Feedback publishes partial sequences; result matches Fibonacci sequence for order=5.
-
-**Status**
-✅ Answered (Explicit)
-
-**Closure evidence**
-Integration test asserts result `[0,1,1,2,3]` and feedback count >= 1.
+Feedback publishes partial sequences; result matches Fibonacci.
 
 </details>
 
 <details>
 <summary><strong>✅ L07-03 — Cancellation is cooperative and delayed under load</strong></summary>
 
-**Observation**
-Cancel accepted; final status CANCELED; partial sequence returned; cancellation latency is visible.
-
-**Status**
-✅ Answered (Explicit)
-
-**Closure evidence**
-Integration test: status==5, sequence length in (1..order-1).
+Cancel accepted; final status CANCELED; partial result returned.
 
 </details>
 
 <details>
 <summary><strong>✅ L07-04 — Starvation probe is externally visible</strong></summary>
 
-**Observation**
-While long action runs under single-threaded executor:
-
-* telemetry pauses
-* lifecycle service responsiveness degrades
-
-**Status**
-✅ Answered (Explicit)
-
-**Closure evidence**
-Integration test: lifecycle get_state future does not complete within short timeout during long action.
+Lifecycle responsiveness degrades during long action under single-thread executor.
 
 </details>
 
 <details>
-<summary><strong>⚠️ L07-05 — Business logic boundary: “long routine outside ROS code” consistency</strong></summary>
+<summary><strong>⚠️ L07-05 — Business logic boundary consistency</strong></summary>
+
+Ensure action servers remain orchestration layers only.
+
+</details>
+
+<details>
+<summary><strong>🟡 L07-06 — Intentional failure is not a bug</strong></summary>
 
 **Observation**
-Python keeps generator logic outside ROS.
-C++ moved Fibonacci routine into `logic.hpp` (good), but ensure action server remains only orchestration and does not re-embed algorithmic steps.
+Lesson 07 demonstrates correct API usage that is operationally insufficient under pressure.
+
+The failure is intentional and provides the pressure that justifies Lesson 08.
 
 **Status**
-⚠️ Open (tracking)
-
-**Closure evidence**
-Action server execute path calls into a routine API (e.g. `routine_.run(order, on_progress)`), not inline Fibonacci steps.
+🟡 Answered (Implicit)
 
 </details>
 
 ---
 
-## 4. Follow-Up Actions Queue (non-sequencing, can be done later)
-
-> This section answers:
-> **What can be worked on later without breaking topic order?**
-> Keep it small and specific.
+### 3.2 Lesson 09 — Composition & Containers
 
 <details>
-<summary><strong>4.1 Documentation alignment</strong></summary>
+<summary><strong>✅ L09-01 — Deployment-induced failure is observable</strong></summary>
 
-* Align Lesson 07 Theory phrasing across tracks:
-
-  * clarify “correct API usage but insufficient scheduling”
-* Ensure Lesson 07 README (C++) mentions reusing Lesson 06 subscriber if desired (optional), or explains why not needed.
+Co-located nodes interfere without code changes.
 
 </details>
 
 <details>
-<summary><strong>4.2 Contract verification</strong></summary>
+<summary><strong>🟡 L09-02 — Tooling gaps are surfaced, not patched</strong></summary>
 
-* Add explicit verification snippets (CLI) for:
-
-  * `/tutorial/fibonacci` presence only after configure/activate (depending on contract)
-  * expected feedback/result in `ros2 action send_goal`
+Python lacks canonical component loading; gap documented explicitly.
 
 </details>
+
+---
+
+### 3.3 Lesson 10 — Launch, Topology & Deployment Verification
+
+<details>
+<summary><strong>✅ L10-01 — Profile A (shared fate) exists</strong></summary>
+
+Both Python and C++ deploy full composition topology.
+
+</details>
+
+<details>
+<summary><strong>✅ L10-02 — Profile B (fault-lined topology) exists</strong></summary>
+
+Selective isolation via process boundaries demonstrated.
+
+</details>
+
+<details>
+<summary><strong>✅ L10-03 — Failure containment is proven</strong></summary>
+
+Worker process death does not terminate control plane.
+
+</details>
+
+---
+
+### 3.4 Cross-cutting architectural observations
+
+<details>
+<summary><strong>🟡 ARC-01 — Control surfaces accrete under pressure</strong></summary>
+
+logs → topics → services → params → lifecycle → scheduling → topology → verification
+
+</details>
+
+<details>
+<summary><strong>🟡 ARC-02 — utils_* is the de facto system contract</strong></summary>
+
+Lessons increasingly behave as experiments against utils-defined contracts.
+
+</details>
+
+<details>
+<summary><strong>🟡 ARC-03 — Topic 10 is a release gate, not a feature</strong></summary>
+
+Deployment truth becomes machine-checkable evidence.
+
+</details>
+
+---
+
+## 4. Follow-Up Actions Queue (non-sequencing)
+
+* Clarify config precedence documentation (PAR-02)
+* Neutralise any “reference lane” wording (EPI-01)
+* Optional: name the control-surface stack once for reader orientation
 
 ---
 
 ## 5. Notes / Decisions (append-only)
 
-* 2026-01-25 — Confirmed `topics.fibonacci` default must be `/tutorial/fibonacci` (not `/<node>/fibonacci`) to support Topics 08+ reuse.
-* 2026-01-25 — Lesson 07 framing: do not “teach by wrongness”; demonstrate correct code that still fails operationally under naïve scheduling.
+* 2026-01-25 — `/tutorial/fibonacci` confirmed as canonical action name.
+* 2026-01-25 — Lesson 07 failure explicitly classified as intentional pressure.
+* 2026-01-26 — Topic 10 confirmed as deployment verification gate, not a launch tutorial.
+
+---
+
+### Closing invariant (implicit, now explicit)
+
+> **No lane declares truth.
+> Pressure reveals it.
+> Tooling observes it.
+> Architecture responds to it.**
